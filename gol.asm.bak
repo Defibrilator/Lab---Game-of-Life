@@ -30,6 +30,7 @@
 
 main: ;; TODO
 
+	#TESTED
 	; BEGIN:clear_leds
 	clear_leds:
 		addi t3, zero, 4						#init t3 to 4
@@ -37,9 +38,10 @@ main: ;; TODO
 		stw zero, LEDS(zero)
 		stw zero, LEDS(t3)
 		stw zero, LEDS(t4)
-		#ret
+		ret
 	; END:clear_leds
 
+	#TESTED
     ; BEGIN:set_pixel
 	set_pixel:
 		add t0, a0, zero						#t0 = x
@@ -56,7 +58,7 @@ main: ;; TODO
 	cont_sp:
 		or t5, t5, t2							#set LED(x, y) to 1
 		stw t5, LEDS(t0)						#store t5 in leds(x/4)
-	#	ret										#return
+		ret										#return
 	; END:set_pixel
 
     ; BEGIN:wait
