@@ -30,6 +30,22 @@
 
 main: ;; TODO
 
+    ; BEGIN:wait
+	wait:
+		addi t0, zero, 1						#init t0 to 1
+		ldw t1, SPEED(zero)						#load SPEED
+		sub t1, t1, t0							#set t1 to SPEED - 1
+		addi t2, zero, 0x800					#init t2 to 2^11
+		slli t2, t2, 8							#shift t2 to 2^19
+		srl t3, t2, t1							#init t3 to t2 multiplied by 2^(SPEED-1)
+	loop_wait:
+		beq t3, zero, end_wait					#end loop if t3 = 0
+		sub t3, t3, t0							#t3 = t3 - 1
+		jmpi loop_wait							#loop
+	end_wait:
+		ret										#return
+	; END:wait	
+
 	#TESTED
 	; BEGIN:clear_leds
 	clear_leds:
@@ -61,21 +77,7 @@ main: ;; TODO
 		ret										#return
 	; END:set_pixel
 
-    ; BEGIN:wait
-	wait:
-		addi t0, zero, 1						#init t0 to 1
-		ldw t1, SPEED(zero)						#load SPEED
-		sub t1, t1, t0							#set t1 to SPEED - 1
-		addi t2, zero, 0x800					#init t2 to 2^11
-		slli t2, t2, 8							#shift t2 to 2^19
-		srl t3, t2, t1							#init t3 to t2 multiplied by 2^(SPEED-1)
-	loop_wait:
-		beq t3, zero, end_wait					#end loop if t3 = 0
-		sub t3, t3, t0							#t3 = t3 - 1
-		jmpi loop_wait							#loop
-	end_wait:
-		ret										#return
-	; END:wait	
+
 
 	; BEGIN:get_gsa
 	get_gsa:
