@@ -28,7 +28,12 @@
     .equ PAUSED, 0x00
     .equ RUNNING, 0x01
 
-main: ;; TODO
+main: 
+	addi a0, zero, 0xFFC
+	addi a1, zero, 1
+	call set_gsa 								#juste pour tester les bails
+	call draw_gsa
+	ret
 
 	#TESTED
 	; BEGIN:clear_leds
@@ -129,7 +134,27 @@ main: ;; TODO
 
     ; BEGIN:random_gsa
 	random_gsa:
-		; your implementation code
+		ldw t0, GSA_ID(zero)					#load gsa id
+		addi t2, zero, 0						#j counter for lines
+		addi t3, zero, 0						#i counter for columns
+		addi t4, zero, 0						#initialize line to 0
+		addi t5, zero, N_GSA_COLUMNS
+		addi t6, zero, N_GSA_LINES
+	for_j_gen_line:
+		ldw t1, RANDOM_NUM(zero)				#load random generator in t1
+		andi t1, t1, 1							#t4 = rand mod 2 (t1 is the random bit)
+		add t4, t4, t1							#t4 added next rand bit
+		slli t4, t4, 1							#t4 = shifted line by 1
+		addi t3, t3, 1							#i = i + 1
+	for_i_lines:
+		blt t3, t5, for_j_gen_line				#jump to next line 
+		add	a0, zero, t4						#line arg
+		add a1, zero, t2						#y coordinate
+		call set_gsa							#set current finished line
+		addi t3, zero, 0							#rest i counter
+		addi t2, t2, 1							#j = j + 1
+	if_random_gsa:
+		blt t2, t6, for_i_lines					#jump back if j is less than cols
 		ret
 	; END:random_gsa
 
