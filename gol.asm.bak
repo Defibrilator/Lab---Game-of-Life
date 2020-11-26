@@ -27,8 +27,22 @@
     .equ MIN_SPEED, 1
     .equ PAUSED, 0x00
     .equ RUNNING, 0x01
+	.equ MAX_STEP, 0x1000
 
-main: ;; TODO
+main: 
+	addi t0, zero, 0xFFE
+	stw t0, CURR_STEP(zero)
+	addi a0, zero, 1
+	addi a1, zero, 0
+	addi a2, zero, 0
+	call change_step
+	addi a0, zero, 1
+	addi a1, zero, 0
+	addi a2, zero, 0
+	call change_step
+	
+	
+
 
 	#TESTED
 	; BEGIN:clear_leds
@@ -101,60 +115,135 @@ main: ;; TODO
 		ret										#return
 	; END:set_gsa
 
+	#TESTED
 	; BEGIN:draw_gsa
 	draw_gsa:
-		add t6, zero, zero						#t6 = 0 the i loop counter
+		add t6, zero, zero						#t6 = 0 the i loop counter (get_gsa)
+		add s1, zero, zero						#s1 = 0 the i2 loop counter (set_pixel)
 		add t7, zero, zero						#t7 = 0 the j loop counter
 	for_i_draw_gsa:
 		add a0, t6, zero						#a0 = i
 		call get_gsa							#get_gsa(i)
-		add s0, v0, zero						#s0 = gsa(i)
-		addi t6, t6, 1							#i = i + 1
+		add s0, v0, zero						#s0 = get_gsa(i)
 	for_j_draw_gsa:
 		addi t0, zero, 1						#init mask to t0
 		sll t0, t0, t7							#t0 << j
 		and t1, s0, t0							#t1 = pixel(x, y)
 		beq t1, zero, if_draw_gsa				#if pixel(x, y) = 0, skip
 		add a0, t7, zero						#a0 = j = x
-		add a1, t6, zero						#a1 = i = y
-		call set_pixel							#set_pixel(j, i)
+		add a1, s1, zero						#a1 = i2 = y
+		call set_pixel							#set_pixel(j, i2)
 	if_draw_gsa:
 		addi t7, t7, 1							#j = j + 1
-		addi t0, zero, 12						#t0 = 12
-		addi t1, zero, 8						#t0 = 8
+		addi t0, zero, N_GSA_COLUMNS			#t0 = 12
+		addi t1, zero, N_GSA_LINES				#t0 = 8
 		blt t7, t0, for_j_draw_gsa				#loop if j < 12
-		blt t6, t1, for_i_draw_gsa				#loop if i < 8
+		add t7, zero, zero						#j = 0
+		addi s1, s1, 1							#i2 = i2 + 1
+		addi t6, t6, 4							#i = i + 4
+		blt s1, t1, for_i_draw_gsa				#loop if i2 < 8
 		ret
 	; END:draw_gsa
 
     ; BEGIN:random_gsa
 	random_gsa:
-		; your implementation code
+		ldw t0, GSA_ID(zero)					#load gsa id
+		addi t2, zero, 0						#j counter for lines
+		addi t3, zero, 0						#i counter for columns
+		addi t4, zero, 0						#initialize line to 0
+		addi t5, zero, N_GSA_COLUMNS
+		addi t6, zero, N_GSA_LINES
+	for_j_gen_line:
+		ldw t1, RANDOM_NUM(zero)				#load random generator in t1
+		andi t1, t1, 1							#t4 = rand mod 2 (t1 is the random bit)
+		add t4, t4, t1							#t4 added next rand bit
+		slli t4, t4, 1							#t4 = shifted line by 1
+		addi t3, t3, 1							#i = i + 1
+	for_i_lines:
+		blt t3, t5, for_j_gen_line				#jump to next line 
+		add	a0, zero, t4						#line arg
+		add a1, zero, t2						#y coordinate
+		call set_gsa							#set current finished line
+		addi t3, zero, 0							#rest i counter
+		addi t2, t2, 1							#j = j + 1
+	if_random_gsa:
+		blt t2, t6, for_i_lines					#jump back if j is less than cols
 		ret
+			
 	; END:random_gsa
 
     ; BEGIN:change_speed
 	change_speed:
-		; your implementation code
+		addi t2, zero, MAX_SPEED
+		addi t2, t2, 1
+		addi t3, zero, MIN_SPEED
+		beq a0, zero, speed_up					#a0 0 for increment and 1 for decrement
+	speed_down:
+		ldw t0, SPEED(zero)						#load current speed
+		addi t1, zero, 1						#t1 = 1
+		sub t0, t0, t1							#check for current speed-1
+		blt t0, t3, end_ch_speed				#if its under min speed jump to end
+		stw t0, SPEED(zero)						#else store it in speed
+		br end_ch_speed							#jump to end
+	speed_up:
+		ldw t0, SPEED(zero)						#same as above but with speed increased
+		addi t1, zero, 1
+		add t0, t0, t1
+		bge t0, t2, end_ch_speed
+		stw t0, SPEED(zero)
+	end_ch_speed:
 		ret
 	; END:change_speed
 
     ; BEGIN:pause_game
 	pause_game:
-		; your implementation code
+		ldw t0, PAUSE(zero)					#load the pause flag
+		xori t0, t0, 1						#flip it
+		stw t0, PAUSE(zero)					#sotre it back
 		ret
 	; END:pause_game
-
+		
+		#TESTED
     ; BEGIN:change_step
 	change_step:
-		; your implementation code
+		ldw t0, CURR_STEP(zero)				#load current step size
+		addi t1, zero, MAX_STEP
+		add t0, t0, a0						#add the units
+		slli a1, a1, 4						#shift left to get 0x10
+		add t0, t0, a1						#add it to the temp step
+		slli a2, a2, 8						#get 0x100 or 0x0 same as above
+		add t0, t0, a2						#add it to the temp step
+		bge t0, t1, reset_step				#check for overflow 
+	ch_step:
+		stw t0, CURR_STEP(zero)				#store it in mem
+		ret
+	reset_step:
+		addi t2, zero, 1
+		stw t2, CURR_STEP(zero)				#store 1 because we have overflow
 		ret
 	; END:change_step
 
     ; BEGIN:increment_seed
 	increment_seed:
-		; your implementation code
+		ldw t0, CURR_STATE(zero)			#load current state
+		addi t1, zero, INIT					#t1 = INIT
+		addi t2, zero, RAND					#t2 = RAND
+		addi s0, zero, SEEDS(zero)			#s0 = seed0
+		addi s1, zero, SEEDS(4)				#s0 = seed0
+		addi s2, zero, SEEDS(8)				#s0 = seed0
+		addi s3, zero, SEEDS(12)			#s0 = seed0
+	
+		beq t0, t1, inc_seed				#if we are in the INIT state
+		beq t0, t2, rand_seed				#if we are in the RAND state
+	inc_seed:
+		ldw t3, SEED(zero)					#t3 = the current game seed
+		addi t3, t3, 1						#increment seed by 1
+		beq t0, s0, set_new_gsa				
 		ret
+	rand_seed:
+		
+		ret
+	set_new_gsa:
 	; END:increment_seed
 
     ; BEGIN:update_state

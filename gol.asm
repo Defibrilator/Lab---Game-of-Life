@@ -30,20 +30,8 @@
 	.equ MAX_STEP, 0x1000
 
 main: 
-	addi t0, zero, 0xFFE
-	stw t0, CURR_STEP(zero)
-	addi a0, zero, 1
-	addi a1, zero, 0
-	addi a2, zero, 0
-	call change_step
-	addi a0, zero, 1
-	addi a1, zero, 0
-	addi a2, zero, 0
-	call change_step
+	call change_speed
 	
-	
-
-
 	#TESTED
 	; BEGIN:clear_leds
 	clear_leds:
@@ -91,6 +79,7 @@ main:
 		ret										#return
 	; END:wait	
 
+	#TESTED
 	; BEGIN:get_gsa
 	get_gsa:
 		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
@@ -174,20 +163,18 @@ main:
 
     ; BEGIN:change_speed
 	change_speed:
-		addi t2, zero, MAX_SPEED
-		addi t2, t2, 1
-		addi t3, zero, MIN_SPEED
+		addi t1, zero, 1						#t1 = 1
+		addi t2, zero, MAX_SPEED				#t2 = MAX_SPEED
+		addi t3, zero, MIN_SPEED				#t3 = MIN_SPEED
 		beq a0, zero, speed_up					#a0 0 for increment and 1 for decrement
 	speed_down:
 		ldw t0, SPEED(zero)						#load current speed
-		addi t1, zero, 1						#t1 = 1
 		sub t0, t0, t1							#check for current speed-1
 		blt t0, t3, end_ch_speed				#if its under min speed jump to end
 		stw t0, SPEED(zero)						#else store it in speed
 		br end_ch_speed							#jump to end
 	speed_up:
 		ldw t0, SPEED(zero)						#same as above but with speed increased
-		addi t1, zero, 1
 		add t0, t0, t1
 		bge t0, t2, end_ch_speed
 		stw t0, SPEED(zero)
@@ -228,10 +215,6 @@ main:
 		ldw t0, CURR_STATE(zero)			#load current state
 		addi t1, zero, INIT					#t1 = INIT
 		addi t2, zero, RAND					#t2 = RAND
-		addi s0, zero, SEEDS(zero)			#s0 = seed0
-		addi s1, zero, SEEDS(4)				#s0 = seed0
-		addi s2, zero, SEEDS(8)				#s0 = seed0
-		addi s3, zero, SEEDS(12)			#s0 = seed0
 	
 		beq t0, t1, inc_seed				#if we are in the INIT state
 		beq t0, t2, rand_seed				#if we are in the RAND state
