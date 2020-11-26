@@ -115,29 +115,33 @@ main:
 		ret										#return
 	; END:set_gsa
 
+	#TESTED
 	; BEGIN:draw_gsa
 	draw_gsa:
-		add t6, zero, zero						#t6 = 0 the i loop counter
+		add t6, zero, zero						#t6 = 0 the i loop counter (get_gsa)
+		add s1, zero, zero						#s1 = 0 the i2 loop counter (set_pixel)
 		add t7, zero, zero						#t7 = 0 the j loop counter
 	for_i_draw_gsa:
 		add a0, t6, zero						#a0 = i
 		call get_gsa							#get_gsa(i)
-		add s0, v0, zero						#s0 = gsa(i)
-		addi t6, t6, 1							#i = i + 1
+		add s0, v0, zero						#s0 = get_gsa(i)
 	for_j_draw_gsa:
 		addi t0, zero, 1						#init mask to t0
 		sll t0, t0, t7							#t0 << j
 		and t1, s0, t0							#t1 = pixel(x, y)
 		beq t1, zero, if_draw_gsa				#if pixel(x, y) = 0, skip
 		add a0, t7, zero						#a0 = j = x
-		add a1, t6, zero						#a1 = i = y
-		call set_pixel							#set_pixel(j, i)
+		add a1, s1, zero						#a1 = i2 = y
+		call set_pixel							#set_pixel(j, i2)
 	if_draw_gsa:
 		addi t7, t7, 1							#j = j + 1
-		addi t0, zero, 12						#t0 = 12
-		addi t1, zero, 8						#t0 = 8
+		addi t0, zero, N_GSA_COLUMNS			#t0 = 12
+		addi t1, zero, N_GSA_LINES				#t0 = 8
 		blt t7, t0, for_j_draw_gsa				#loop if j < 12
-		blt t6, t1, for_i_draw_gsa				#loop if i < 8
+		add t7, zero, zero						#j = 0
+		addi s1, s1, 1							#i2 = i2 + 1
+		addi t6, t6, 4							#i = i + 4
+		blt s1, t1, for_i_draw_gsa				#loop if i2 < 8
 		ret
 	; END:draw_gsa
 
@@ -221,9 +225,25 @@ main:
 
     ; BEGIN:increment_seed
 	increment_seed:
-		ldw t0, CURR_STATE(zero)
+		ldw t0, CURR_STATE(zero)			#load current state
+		addi t1, zero, INIT					#t1 = INIT
+		addi t2, zero, RAND					#t2 = RAND
+		addi s0, zero, SEEDS(zero)			#s0 = seed0
+		addi s1, zero, SEEDS(4)				#s0 = seed0
+		addi s2, zero, SEEDS(8)				#s0 = seed0
+		addi s3, zero, SEEDS(12)			#s0 = seed0
+	
+		beq t0, t1, inc_seed				#if we are in the INIT state
+		beq t0, t2, rand_seed				#if we are in the RAND state
+	inc_seed:
+		ldw t3, SEED(zero)					#t3 = the current game seed
+		addi t3, t3, 1						#increment seed by 1
+		beq t0, s0, set_new_gsa				
+		ret
+	rand_seed:
 		
 		ret
+	set_new_gsa:
 	; END:increment_seed
 
     ; BEGIN:update_state
