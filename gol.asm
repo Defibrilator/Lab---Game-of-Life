@@ -30,7 +30,46 @@
 	.equ MAX_STEP, 0x1000
 
 main: 
-	call change_speed
+	; BEGIN:update_state
+	update_state:
+		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
+		addi t1, zero, INIT						#t1 = 0
+		addi t2, zero, RAND						#t2 = 1
+		addi t3, zero, RUN						#t3 = 2
+		addi t6, zero, 1						#t6 = 1
+		slli t6, zero, 1						#t6 = 0b10
+		and t6, t6, a0							#t6 = b1
+		beq t0, t1, update_state_init			#update from init
+		beq t0, t2, update_state_rand			#update from rand
+		beq t0, t3, update_state_run			#update from run
+
+	#INIT
+	update_state_init:
+		ldw t4, SEED(zero) 						#t4 = SEED
+		ldw t5, N_SEEDS(zero)					#t5 = N_SEEDS
+		beq t6, t2, us_init_to_run				#if b1 = 1 -> change state to run
+		beq t4, t5, us_init_to_rand				#else if b0 = N -> change state to rand
+		jmpi end_update_state					#else ret
+	us_init_to_run:
+		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
+		jmpi end_update_state					#ret
+	us_init_to_rand:
+		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
+		
+		jmpi end_update_state					#ret
+
+	#RAND
+	update_state_rand:
+		beq t6, t2, us_rand_to_run				#if b1 = 1 -> change to run
+		jmpi end_update_state
+	us_rand_to_run:
+
+	#RUN
+	update_state_run:
+		
+	end_update_state:
+		ret
+	; END:update_state
 	
 	#TESTED
 	; BEGIN:clear_leds
@@ -65,15 +104,13 @@ main:
 
     ; BEGIN:wait
 	wait:
-		addi t0, zero, 1						#init t0 to 1
-		ldw t1, SPEED(zero)						#load SPEED
-		sub t1, t1, t0							#set t1 to SPEED - 1
-		addi t2, zero, 0x800					#init t2 to 2^11
-		slli t2, t2, 8							#shift t2 to 2^19
-		srl t3, t2, t1							#init t3 to t2 multiplied by 2^(SPEED-1)
+		addi t0, zero, 1						#t0 = 1
+		ldw t1, SPEED(zero)						#t1 = SPEED
+		addi t2, zero, 0x800					#t2 = 2^11
+		slli t2, t2, 8							#t2 = 2^19
 	loop_wait:
-		beq t3, zero, end_wait					#end loop if t3 = 0
-		sub t3, t3, t0							#t3 = t3 - 1
+		blt t2, t0, end_wait					#end loop if t2 < 1
+		sub t2, t2, t1							#t2 = t2 - SPEED
 		jmpi loop_wait							#loop
 	end_wait:
 		ret										#return
@@ -161,6 +198,7 @@ main:
 			
 	; END:random_gsa
 
+	#TESTED
     ; BEGIN:change_speed
 	change_speed:
 		addi t1, zero, 1						#t1 = 1
@@ -186,7 +224,7 @@ main:
 	pause_game:
 		ldw t0, PAUSE(zero)					#load the pause flag
 		xori t0, t0, 1						#flip it
-		stw t0, PAUSE(zero)					#sotre it back
+		stw t0, PAUSE(zero)					#store it back
 		ret
 	; END:pause_game
 		
@@ -229,11 +267,7 @@ main:
 	set_new_gsa:
 	; END:increment_seed
 
-    ; BEGIN:update_state
-	update_state:
-		; your implementation code
-		ret
-	; END:update_state
+
 
     ; BEGIN:select_action
 	select_action:
