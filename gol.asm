@@ -27,10 +27,23 @@
     .equ MIN_SPEED, 1
     .equ PAUSED, 0x00
     .equ RUNNING, 0x01
+	.equ MAX_STEP, 0x1000
 
 main: 
-
+	addi t0, zero, 0xFFE
+	stw t0, CURR_STEP(zero)
+	addi a0, zero, 1
+	addi a1, zero, 0
+	addi a2, zero, 0
+	call change_step
+	addi a0, zero, 1
+	addi a1, zero, 0
+	addi a2, zero, 0
+	call change_step
 	
+	
+
+
 	#TESTED
 	; BEGIN:clear_leds
 	clear_leds:
@@ -51,11 +64,11 @@ main:
 		sll t2, t2, a1							#shift mask t2 by y
 		addi t3, zero, 1						#init t3 to 1	
 		ldw t5, LEDS(t0)						#load leds(x) in t5
-		beq t1, zero, cont_sp						#if t1 = 0, skip loop
+		beq t1, zero, cont_sp					#if t1 = 0, skip loop
 	loop_sp:
-		slli t2, t2, N_GSA_LINES					#shift mask by 8
+		slli t2, t2, N_GSA_LINES				#shift mask by 8
 		sub t1, t1, t3							#t1 = t1 - 1
-		bne t1, zero, loop_sp						#loop if t1 != 0
+		bne t1, zero, loop_sp					#loop if t1 != 0
 	cont_sp:
 		or t5, t5, t2							#set LED(x, y) to 1
 		stw t5, LEDS(t0)						#store t5 in leds(x/4)
@@ -67,11 +80,11 @@ main:
 		addi t0, zero, 1						#init t0 to 1
 		ldw t1, SPEED(zero)						#load SPEED
 		sub t1, t1, t0							#set t1 to SPEED - 1
-		addi t2, zero, 0x800						#init t2 to 2^11
+		addi t2, zero, 0x800					#init t2 to 2^11
 		slli t2, t2, 8							#shift t2 to 2^19
 		srl t3, t2, t1							#init t3 to t2 multiplied by 2^(SPEED-1)
 	loop_wait:
-		beq t3, zero, end_wait						#end loop if t3 = 0
+		beq t3, zero, end_wait					#end loop if t3 = 0
 		sub t3, t3, t0							#t3 = t3 - 1
 		jmpi loop_wait							#loop
 	end_wait:
@@ -80,8 +93,8 @@ main:
 
 	; BEGIN:get_gsa
 	get_gsa:
-		ldw t0, GSA_ID(zero)						#load GSA_ID in t0
-		bne t0, zero, gsa1_get						#if the current gsa is 1 go to gsa1_get
+		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
+		bne t0, zero, gsa1_get					#if the current gsa is 1 go to gsa1_get
 		ldw v0, GSA0(a0)						#load GSA0(a0) in v0
 		jmpi end_get_gsa						#return
 	gsa1_get:
@@ -92,8 +105,8 @@ main:
 
 	; BEGIN:set_gsa
 	set_gsa:
-		ldw t0, GSA_ID(zero)						#load GSA_ID in t0
-		beq t0, zero, gsa1_set						#if the current gsa is the 0 go to gsa1_set
+		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
+		beq t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
 		stw a0, GSA0(a1)						#store a0 (the line) in correct GSA0 element
 		jmpi end_get_gsa						#return
 	gsa1_set:
@@ -115,7 +128,7 @@ main:
 		addi t0, zero, 1						#init mask to t0
 		sll t0, t0, t7							#t0 << j
 		and t1, s0, t0							#t1 = pixel(x, y)
-		beq t1, zero, if_draw_gsa					#if pixel(x, y) = 0, skip
+		beq t1, zero, if_draw_gsa				#if pixel(x, y) = 0, skip
 		add a0, t7, zero						#a0 = j = x
 		add a1, t6, zero						#a1 = i = y
 		call set_pixel							#set_pixel(j, i)
@@ -123,53 +136,53 @@ main:
 		addi t7, t7, 1							#j = j + 1
 		addi t0, zero, 12						#t0 = 12
 		addi t1, zero, 8						#t0 = 8
-		blt t7, t0, for_j_draw_gsa					#loop if j < 12
-		blt t6, t1, for_i_draw_gsa					#loop if i < 8
+		blt t7, t0, for_j_draw_gsa				#loop if j < 12
+		blt t6, t1, for_i_draw_gsa				#loop if i < 8
 		ret
 	; END:draw_gsa
 
     ; BEGIN:random_gsa
 	random_gsa:
-		ldw t0, GSA_ID(zero)						#load gsa id
+		ldw t0, GSA_ID(zero)					#load gsa id
 		addi t2, zero, 0						#j counter for lines
 		addi t3, zero, 0						#i counter for columns
 		addi t4, zero, 0						#initialize line to 0
 		addi t5, zero, N_GSA_COLUMNS
 		addi t6, zero, N_GSA_LINES
 	for_j_gen_line:
-		ldw t1, RANDOM_NUM(zero)					#load random generator in t1
+		ldw t1, RANDOM_NUM(zero)				#load random generator in t1
 		andi t1, t1, 1							#t4 = rand mod 2 (t1 is the random bit)
 		add t4, t4, t1							#t4 added next rand bit
 		slli t4, t4, 1							#t4 = shifted line by 1
 		addi t3, t3, 1							#i = i + 1
 	for_i_lines:
-		blt t3, t5, for_j_gen_line					#jump to next line 
+		blt t3, t5, for_j_gen_line				#jump to next line 
 		add	a0, zero, t4						#line arg
 		add a1, zero, t2						#y coordinate
 		call set_gsa							#set current finished line
-		addi t3, zero, 0						#reset i counter
+		addi t3, zero, 0							#rest i counter
 		addi t2, t2, 1							#j = j + 1
 	if_random_gsa:
-		blt t2, t6, for_i_lines						#jump back if j is less than cols
-		ret		
+		blt t2, t6, for_i_lines					#jump back if j is less than cols
+		ret
+			
 	; END:random_gsa
-	
-	#TESTED
+
     ; BEGIN:change_speed
 	change_speed:
 		addi t2, zero, MAX_SPEED
 		addi t2, t2, 1
 		addi t3, zero, MIN_SPEED
-		beq a0, zero, speed_up
+		beq a0, zero, speed_up					#a0 0 for increment and 1 for decrement
 	speed_down:
-		ldw t0, SPEED(zero)
-		addi t1, zero, 1
-		sub t0, t0, t1
-		blt t0, t3, end_ch_speed
-		stw t0, SPEED(zero)
-		br end_ch_speed
+		ldw t0, SPEED(zero)						#load current speed
+		addi t1, zero, 1						#t1 = 1
+		sub t0, t0, t1							#check for current speed-1
+		blt t0, t3, end_ch_speed				#if its under min speed jump to end
+		stw t0, SPEED(zero)						#else store it in speed
+		br end_ch_speed							#jump to end
 	speed_up:
-		ldw t0, SPEED(zero)
+		ldw t0, SPEED(zero)						#same as above but with speed increased
 		addi t1, zero, 1
 		add t0, t0, t1
 		bge t0, t2, end_ch_speed
@@ -177,17 +190,16 @@ main:
 	end_ch_speed:
 		ret
 	; END:change_speed
-	
-	#TESTED
+
     ; BEGIN:pause_game
 	pause_game:
-		ldw t0, PAUSE(zero)						#load pause flag
-		xori t0, t0, 1							#flip it
-		stw t0, PAUSE(zero)						#store it back
+		ldw t0, PAUSE(zero)					#load the pause flag
+		xori t0, t0, 1						#flip it
+		stw t0, PAUSE(zero)					#sotre it back
 		ret
 	; END:pause_game
-
-    	#TESTED
+		
+		#TESTED
     ; BEGIN:change_step
 	change_step:
 		ldw t0, CURR_STEP(zero)				#load current step size
@@ -209,7 +221,8 @@ main:
 
     ; BEGIN:increment_seed
 	increment_seed:
-		; your implementation code
+		ldw t0, CURR_STATE(zero)
+		
 		ret
 	; END:increment_seed
 
