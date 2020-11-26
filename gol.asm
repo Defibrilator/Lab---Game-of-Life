@@ -189,13 +189,20 @@ main:
     	#TESTED
     ; BEGIN:change_step
 	change_step:
-		ldw t0, CURR_STEP(zero)					#load current step size
+		ldw t0, CURR_STEP(zero)				#load current step size
+		addi t1, zero, MAX_STEP
 		add t0, t0, a0						#add the units
 		slli a1, a1, 4						#shift left to get 0x10
 		add t0, t0, a1						#add it to the temp step
 		slli a2, a2, 8						#get 0x100 or 0x0 same as above
 		add t0, t0, a2						#add it to the temp step
-		stw t0, CURR_STEP(zero)					#store it in mem
+		bge t0, t1, reset_step				#check for overflow 
+	ch_step:
+		stw t0, CURR_STEP(zero)				#store it in mem
+		ret
+	reset_step:
+		addi t2, zero, 1
+		stw t2, CURR_STEP(zero)				#store 1 because we have overflow
 		ret
 	; END:change_step
 
