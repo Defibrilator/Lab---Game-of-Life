@@ -186,9 +186,16 @@ main:
 		ret
 	; END:pause_game
 
+    	#TESTED
     ; BEGIN:change_step
 	change_step:
-		; your implementation code
+		ldw t0, CURR_STEP(zero)					#load current step size
+		add t0, t0, a0						#add the units
+		slli a1, a1, 4						#shift left to get 0x10
+		add t0, t0, a1						#add it to the temp step
+		slli a2, a2, 8						#get 0x100 or 0x0 same as above
+		add t0, t0, a2						#add it to the temp step
+		stw t0, CURR_STEP(zero)					#store it in mem
 		ret
 	; END:change_step
 
