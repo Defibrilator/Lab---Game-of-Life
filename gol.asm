@@ -29,12 +29,7 @@
     .equ RUNNING, 0x01
 
 main: 
-	addi a0, zero, 0xFFC
-	addi a1, zero, 1
-	call set_gsa 								#juste pour tester les bails
-	call draw_gsa
-	ret
-
+	
 	#TESTED
 	; BEGIN:clear_leds
 	clear_leds:
@@ -151,16 +146,33 @@ main:
 		add	a0, zero, t4						#line arg
 		add a1, zero, t2						#y coordinate
 		call set_gsa							#set current finished line
-		addi t3, zero, 0							#rest i counter
+		addi t3, zero, 0						#reset i counter
 		addi t2, t2, 1							#j = j + 1
 	if_random_gsa:
 		blt t2, t6, for_i_lines					#jump back if j is less than cols
-		ret
+		ret		
 	; END:random_gsa
 
     ; BEGIN:change_speed
 	change_speed:
-		; your implementation code
+		addi t2, zero, MAX_SPEED
+		addi t2, t2, 1
+		addi t3, zero, MIN_SPEED
+		beq a0, zero, speed_up
+	speed_down:
+		ldw t0, SPEED(zero)
+		addi t1, zero, 1
+		sub t0, t0, t1
+		blt t0, t3, end_ch_speed
+		stw t0, SPEED(zero)
+		br end_ch_speed
+	speed_up:
+		ldw t0, SPEED(zero)
+		addi t1, zero, 1
+		add t0, t0, t1
+		bge t0, t2, end_ch_speed
+		stw t0, SPEED(zero)
+	end_ch_speed:
 		ret
 	; END:change_speed
 
