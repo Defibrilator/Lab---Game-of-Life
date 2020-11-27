@@ -29,7 +29,7 @@
     .equ RUNNING, 0x01
 	.equ MAX_STEP, 0x1000
 
-main: 
+main:
 	
 	
 	#TESTED
@@ -81,23 +81,26 @@ main:
 	; BEGIN:get_gsa
 	get_gsa:
 		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
+		slli t1, a0, 2							#t1 = a0 * 4
 		bne t0, zero, gsa1_get					#if the current gsa is 1 go to gsa1_get
-		ldw v0, GSA0(a0)						#load GSA0(a0) in v0
+		ldw v0, GSA0(t1)						#load GSA0(t1) in v0
 		jmpi end_get_gsa						#return
 	gsa1_get:
-		ldw v0, GSA1(a0)						#load GSA1(a0) in v0
+		ldw v0, GSA1(t1)						#load GSA1(t1) in v0
 	end_get_gsa:
 		ret										#return
 	; END:get_gsa
 
+	#TESTED
 	; BEGIN:set_gsa
 	set_gsa:
 		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
-		beq t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
-		stw a0, GSA0(a1)						#store a0 (the line) in correct GSA0 element
+		slli t1, a1, 2							#t1 = a0 * 4
+		bne t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
+		stw a0, GSA0(t1)						#store a0 (the line) in correct GSA0 element
 		jmpi end_get_gsa						#return
 	gsa1_set:
-		stw a0, GSA1(a1)						#store a0 (the line) in correct GSA1 element
+		stw a0, GSA1(t1)						#store t1 (the line) in correct GSA1 element
 	end_set_gsa:
 		ret										#return
 	; END:set_gsa
@@ -105,16 +108,14 @@ main:
 	#TESTED
 	; BEGIN:draw_gsa
 	draw_gsa:
-		add t6, zero, zero						#t6 = 0 the i loop counter (get_gsa)
-		add s1, zero, zero						#s1 = 0 the i2 loop counter (set_pixel)
+		addi sp, sp, -4							#decrement stack pointer
+		stw ra, 0(sp)							#add return address to the stack
+
+		add t6, zero, zero						#t6 = 0 the i loop counter
 		add t7, zero, zero						#t7 = 0 the j loop counter
 	for_i_draw_gsa:
 		add a0, t6, zero						#a0 = i
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, (sp)							#add return address to the stack
 		call get_gsa							#get_gsa(i)
-		ldw ra, (sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
 		add s0, v0, zero						#s0 = get_gsa(i)
 	for_j_draw_gsa:
 		addi t0, zero, 1						#init mask to t0
@@ -122,21 +123,19 @@ main:
 		and t1, s0, t0							#t1 = pixel(x, y)
 		beq t1, zero, if_draw_gsa				#if pixel(x, y) = 0, skip
 		add a0, t7, zero						#a0 = j = x
-		add a1, s1, zero						#a1 = i2 = y
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, (sp)							#add return address to the stack
-		call set_pixel							#set_pixel(j, i2)
-		ldw ra, (sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
+		add a1, t6, zero						#a1 = i = y
+		call set_pixel							#set_pixel(j, i)
 	if_draw_gsa:
 		addi t7, t7, 1							#j = j + 1
 		addi t0, zero, N_GSA_COLUMNS			#t0 = 12
-		addi t1, zero, N_GSA_LINES				#t0 = 8
+		addi t1, zero, N_GSA_LINES				#t1 = 8
 		blt t7, t0, for_j_draw_gsa				#loop if j < 12
 		add t7, zero, zero						#j = 0
-		addi s1, s1, 1							#i2 = i2 + 1
-		addi t6, t6, 4							#i = i + 4
-		blt s1, t1, for_i_draw_gsa				#loop if i2 < 8
+		addi t6, t6, 1							#i = i + 1
+		blt t6, t1, for_i_draw_gsa				#loop if i < 8
+
+		ldw ra, 0(sp)							#copy return address from stack to ra
+		addi sp, sp, 4							#increment stack pointer
 		ret
 	; END:draw_gsa
 
@@ -159,9 +158,9 @@ main:
 		add	a0, zero, t4						#line arg
 		add a1, zero, t2						#y coordinate
 		addi sp, sp, -4							#decrement stack pointer
-		stw ra, (sp)							#add return address to the stack
+		stw ra, 0(sp)							#add return address to the stack
 		call set_gsa							#set current finished line
-		ldw ra, (sp)							#copy return address from stack to ra
+		ldw ra, 0(sp)							#copy return address from stack to ra
 		addi sp, sp, 4							#increment stack pointer
 		addi t3, zero, 0						#rest i counter
 		addi t2, t2, 1							#j = j + 1
@@ -253,7 +252,7 @@ main:
 		beq t0, t2, update_state_rand			#update from rand
 		beq t0, t3, update_state_run			#update from run
 
-	#INIT
+		#INIT
 	update_state_init:
 		ldw t4, SEED(zero) 						#t4 = SEED
 		ldw t5, N_SEEDS(zero)					#t5 = N_SEEDS
@@ -267,13 +266,13 @@ main:
 	us_init_to_rand:
 		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
 		addi sp, sp, -4							#decrement stack pointer
-		stw ra, (sp)							#add return address to the stack
+		stw ra, 0(sp)							#add return address to the stack
 		call random_gsa							#generate random seed
-		ldw ra, (sp)							#copy return address from stack to ra
+		ldw ra, 0(sp)							#copy return address from stack to ra
 		addi sp, sp, 4							#increment stack pointer
 		jmpi end_update_state					#ret
 
-	#RAND
+		#RAND
 	update_state_rand:
 		beq t6, t2, us_rand_to_run				#if b1 = 1 -> change to run
 		jmpi end_update_state					#else stay on rand
@@ -282,7 +281,7 @@ main:
 		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
 		jmpi end_update_state					#ret
 
-	#RUN
+		#RUN
 	update_state_run:
 		addi t6, zero, 1						#t6 = 1
 		slli t6, zero, 3						#t6 = 0b1000
@@ -299,7 +298,69 @@ main:
 
     ; BEGIN:select_action
 	select_action:
-		; your implementation code
+		addi sp, sp, -4							#decrement stack pointer
+		stw ra, 0(sp)							#add return address to the stack
+		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
+		addi t2, zero, RAND						#t2 = 1
+		addi t3, zero, RUN						#t3 = 2
+		and t4, t2, a0							#t4 = b0
+		slli t5, t2, 1							#t5 = 0b00010
+		and t5, t5, a0							#t5 = b1
+		slli t6, t2, 2							#t6 = 0b00100
+		and t6, t6, a0							#t6 = b2
+		slli t7, t2, 3							#t7 = 0b01000
+		and t7, t7, a0							#t7 = b3
+		slli t1, t2, 4							#t1 = 0b10000
+		and t1, t1, a0							#t1 = b4
+		beq t0, zero, select_init				#update from init
+	#	beq t0, t2, select_rand					#update from rand
+	#nht('é&a	beq t0, t3, select_run					#update from run
+
+	select_init:
+		bne t4, zero, sa_increment_seed			#if b0 = 1 -> increment seed
+		bne t5, zero, sa_start_game				#else if b1 = 1 -> start game
+		or t6, t6, t7							#t6 = b2 or b3
+		or t6, t6, t1							#t6 = t6 or b4
+		bne t6, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
+		br end_select_action					#else do nothing
+
+	sa_increment_seed:
+		call increment_seed						#increment seed
+		br end_select_action					#return
+
+	sa_start_game:
+		call update_state						#change state
+		br end_select_action					#return
+		
+	sa_change_step:
+		call change_step						#change_step
+		br end_select_action					#return
+
+	sa_random_gsa:
+		call random_gsa							#random gsa
+		br end_select_action					#return
+
+	sa_pause_game:
+		call pause_game							#pause_game
+		br end_select_action					#return
+
+	sa_inc_speed:
+		add a0, zero, zero						#a0 = 0
+		call change_speed						#increment speed
+		br end_select_action					#return
+
+	sa_dec_speed:
+		addi a0, zero, 1						#a0 = 1
+		call change_speed						#decrement speed
+		br end_select_action					#return
+
+	sa_reset_game:
+		call reset_game							#reset_game
+
+
+	end_select_action:
+		ldw ra, 0(sp)							#copy return address from stack to ra
+		addi sp, sp, 4							#increment stack pointer
 		ret
 	; END:select_action
 
