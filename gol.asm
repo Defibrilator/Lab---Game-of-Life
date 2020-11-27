@@ -409,7 +409,12 @@ main:
 
     ; BEGIN:find_neighbours
 	find_neighbours:
-		; your implementation code
+		#a0 = x coordinate
+		#a1 = y coordinate
+		#v0 = nb of neighbours
+		#state of the cell in question
+
+
 		ret
 	; END:find_neighbours
 
@@ -439,9 +444,14 @@ main:
 
 	;BEGIN:helper
 	mod:
+		blt a0, zero, negative
 		blt a0, a1, end_mod
 		sub a0, a0, a1
 		jmpi mod
+	negative:
+		bge a0, zero, end_mod
+		add a0, a0, a1
+		jmpi negative
 	end_mod:
 		add v0, zero, a0
 		ret
