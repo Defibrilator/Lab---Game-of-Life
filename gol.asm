@@ -437,6 +437,16 @@ main:
 		ret
 	; END:reset_game
 
+	;BEGIN:helper
+	mod:
+		blt a0, a1, end_mod
+		sub a0, a0, a1
+		jmpi mod
+	end_mod:
+		add v0, zero, a0
+		ret
+	;END:helper
+
 font_data:
     .word 0xFC ; 0
     .word 0x60 ; 1
