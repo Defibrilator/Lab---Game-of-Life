@@ -30,7 +30,19 @@
 	.equ MAX_STEP, 0x1000
 
 main:
-	
+	addi sp, zero, 0x2000
+	addi t0, zero, 0
+	stw t0, SEED(zero)
+	call increment_seed
+	call draw_gsa
+	call increment_seed
+	call draw_gsa
+	call increment_seed
+	call draw_gsa 
+	call increment_seed
+	call draw_gsa
+	call increment_seed
+	call draw_gsa
 	
 	#TESTED
 	; BEGIN:clear_leds
@@ -110,6 +122,8 @@ main:
 	draw_gsa:
 		addi sp, sp, -4							#decrement stack pointer
 		stw ra, 0(sp)							#add return address to the stack
+		
+		call clear_leds
 
 		add t6, zero, zero						#t6 = 0 the i loop counter
 		add t7, zero, zero						#t7 = 0 the j loop counter
@@ -222,21 +236,44 @@ main:
 
     ; BEGIN:increment_seed
 	increment_seed:
-		ldw t0, CURR_STATE(zero)			#load current state
-		addi t1, zero, INIT					#t1 = INIT
-		addi t2, zero, RAND					#t2 = RAND
-	
-		beq t0, t1, inc_seed				#if we are in the INIT state
-		beq t0, t2, rand_seed				#if we are in the RAND state
-	inc_seed:
-		ldw t3, SEED(zero)					#t3 = the current game seed
-		addi t3, t3, 1						#increment seed by 1
-		beq t0, s0, set_new_gsa				
-		ret
-	rand_seed:
+		addi sp, sp ,-4
+		stw ra, 0(sp)
+		ldw t0, SEED(zero)						#load seed in t0
+		addi t0, t0, 1							#increment by 1
+		addi t1, zero, N_SEEDS
+		bge t0, t1, rand_set					#if over N goto rand_set
+		stw t0, SEED(zero)						#store it in SEED
+
+		slli t0, t0, 2							#t0 * 4 for addressing
+		ldw t2, SEEDS(t0)						#t2 has the current seed
 		
+		addi t1, zero, 0						#i=0
+		addi t3, zero, N_GSA_LINES				#max lines
+	incr_loop:
+		beq t1, t3, increment_end				#goto end if i = N_GSA_LINES
+		ldw t4, 0(t2)							#t4 = corresponding line
+		add a0, zero, t4						#set arg0 to t4
+		add a1, zero, t1						#set arg1 to i
+
+		addi sp, sp, -8
+		stw t0, 0(sp)
+		stw t1, 4(sp)
+		call set_gsa							#set the new line
+		ldw t1, 4(sp)
+		ldw t0, 0(sp)
+		addi sp, sp, 8
+
+		addi t2, t2, 4							#increment t2 by 4
+		addi t1, t1, 1							#i=i+1
+		jmpi incr_loop							#loop back
+
+	rand_set:
+		call random_gsa
+
+	increment_end:
+		ldw ra, 0(sp)
+		addi sp, sp, 4
 		ret
-	set_new_gsa:
 	; END:increment_seed
 
 	; BEGIN:update_state
