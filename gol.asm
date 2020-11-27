@@ -30,46 +30,7 @@
 	.equ MAX_STEP, 0x1000
 
 main: 
-	; BEGIN:update_state
-	update_state:
-		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
-		addi t1, zero, INIT						#t1 = 0
-		addi t2, zero, RAND						#t2 = 1
-		addi t3, zero, RUN						#t3 = 2
-		addi t6, zero, 1						#t6 = 1
-		slli t6, zero, 1						#t6 = 0b10
-		and t6, t6, a0							#t6 = b1
-		beq t0, t1, update_state_init			#update from init
-		beq t0, t2, update_state_rand			#update from rand
-		beq t0, t3, update_state_run			#update from run
-
-	#INIT
-	update_state_init:
-		ldw t4, SEED(zero) 						#t4 = SEED
-		ldw t5, N_SEEDS(zero)					#t5 = N_SEEDS
-		beq t6, t2, us_init_to_run				#if b1 = 1 -> change state to run
-		beq t4, t5, us_init_to_rand				#else if b0 = N -> change state to rand
-		jmpi end_update_state					#else ret
-	us_init_to_run:
-		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
-		jmpi end_update_state					#ret
-	us_init_to_rand:
-		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
-		
-		jmpi end_update_state					#ret
-
-	#RAND
-	update_state_rand:
-		beq t6, t2, us_rand_to_run				#if b1 = 1 -> change to run
-		jmpi end_update_state
-	us_rand_to_run:
-
-	#RUN
-	update_state_run:
-		
-	end_update_state:
-		ret
-	; END:update_state
+	
 	
 	#TESTED
 	; BEGIN:clear_leds
@@ -149,7 +110,11 @@ main:
 		add t7, zero, zero						#t7 = 0 the j loop counter
 	for_i_draw_gsa:
 		add a0, t6, zero						#a0 = i
+		addi sp, sp, -4							#decrement stack pointer
+		stw ra, (sp)							#add return address to the stack
 		call get_gsa							#get_gsa(i)
+		ldw ra, (sp)							#copy return address from stack to ra
+		addi sp, sp, 4							#increment stack pointer
 		add s0, v0, zero						#s0 = get_gsa(i)
 	for_j_draw_gsa:
 		addi t0, zero, 1						#init mask to t0
@@ -158,7 +123,11 @@ main:
 		beq t1, zero, if_draw_gsa				#if pixel(x, y) = 0, skip
 		add a0, t7, zero						#a0 = j = x
 		add a1, s1, zero						#a1 = i2 = y
+		addi sp, sp, -4							#decrement stack pointer
+		stw ra, (sp)							#add return address to the stack
 		call set_pixel							#set_pixel(j, i2)
+		ldw ra, (sp)							#copy return address from stack to ra
+		addi sp, sp, 4							#increment stack pointer
 	if_draw_gsa:
 		addi t7, t7, 1							#j = j + 1
 		addi t0, zero, N_GSA_COLUMNS			#t0 = 12
@@ -189,8 +158,12 @@ main:
 		blt t3, t5, for_j_gen_line				#jump to next line 
 		add	a0, zero, t4						#line arg
 		add a1, zero, t2						#y coordinate
+		addi sp, sp, -4							#decrement stack pointer
+		stw ra, (sp)							#add return address to the stack
 		call set_gsa							#set current finished line
-		addi t3, zero, 0							#rest i counter
+		ldw ra, (sp)							#copy return address from stack to ra
+		addi sp, sp, 4							#increment stack pointer
+		addi t3, zero, 0						#rest i counter
 		addi t2, t2, 1							#j = j + 1
 	if_random_gsa:
 		blt t2, t6, for_i_lines					#jump back if j is less than cols
@@ -267,7 +240,62 @@ main:
 	set_new_gsa:
 	; END:increment_seed
 
+	; BEGIN:update_state
+	update_state:
+		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
+		addi t1, zero, INIT						#t1 = 0
+		addi t2, zero, RAND						#t2 = 1
+		addi t3, zero, RUN						#t3 = 2
+		addi t6, zero, 1						#t6 = 1
+		slli t6, zero, 1						#t6 = 0b10
+		and t6, t6, a0							#t6 = b1
+		beq t0, t1, update_state_init			#update from init
+		beq t0, t2, update_state_rand			#update from rand
+		beq t0, t3, update_state_run			#update from run
 
+	#INIT
+	update_state_init:
+		ldw t4, SEED(zero) 						#t4 = SEED
+		ldw t5, N_SEEDS(zero)					#t5 = N_SEEDS
+		beq t6, t2, us_init_to_run				#if b1 = 1 -> change state to run
+		beq t4, t5, us_init_to_rand				#else if b0 = N -> change state to rand
+		jmpi end_update_state					#else ret
+	us_init_to_run:
+		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
+		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
+		jmpi end_update_state					#ret
+	us_init_to_rand:
+		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
+		addi sp, sp, -4							#decrement stack pointer
+		stw ra, (sp)							#add return address to the stack
+		call random_gsa							#generate random seed
+		ldw ra, (sp)							#copy return address from stack to ra
+		addi sp, sp, 4							#increment stack pointer
+		jmpi end_update_state					#ret
+
+	#RAND
+	update_state_rand:
+		beq t6, t2, us_rand_to_run				#if b1 = 1 -> change to run
+		jmpi end_update_state					#else stay on rand
+	us_rand_to_run:
+		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
+		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
+		jmpi end_update_state					#ret
+
+	#RUN
+	update_state_run:
+		addi t6, zero, 1						#t6 = 1
+		slli t6, zero, 3						#t6 = 0b1000
+		and t6, t6, a0							#t6 = b3
+		ldw t0, CURR_STEP(zero)					#t0 = CURR_STEP
+		ldw t4, MAX_STEP(zero)					#t4 = MAX_STEP
+		blt t0, t4, end_update_state			#if CURR_STEP < MAX_STEP -> do nothing
+		bne t6, t2, end_update_state			#or if b1 != 1 -> do nothing
+		stw t1, CURR_STATE(zero)				#else CURR_STATE = INIT	
+		
+	end_update_state:
+		ret
+	; END:update_state
 
     ; BEGIN:select_action
 	select_action:
