@@ -444,16 +444,16 @@ main:
 
 	;BEGIN:helper
 	mod:
-		blt a0, zero, negative
-		blt a0, a1, end_mod
-		sub a0, a0, a1
-		jmpi mod
+		blt a0, zero, negative			#procedure for negatives
+		blt a0, a1, end_mod				#end condition
+		sub a0, a0, a1					#a=a-mod
+		jmpi mod						#loop it
 	negative:
-		bge a0, zero, end_mod
-		add a0, a0, a1
+		bge a0, zero, end_mod			#a>=0  -> end
+		add a0, a0, a1					#a=a+mod
 		jmpi negative
 	end_mod:
-		add v0, zero, a0
+		add v0, zero, a0				#return a0 mod a1
 		ret
 	;END:helper
 
