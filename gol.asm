@@ -504,9 +504,38 @@ main:
 		ret
 	; END:update_gsa
 
+    ; BEGIN:mask
+	mask:
+		; your implementation code
+		ret
+	; END:mask
+
     ; BEGIN:get_input
 	get_input:
-		; your implementation code
+		ldw t0, BUTTONS+4(zero)
+		addi t2, zero, 1						#t2 = 1
+
+		and t4, t2, t0							#t4 = b0
+		bne t4, zero, end_get_input				#if b0 != 0 -> return
+
+		slli t4, t2, 1							#t4 = 0b00010
+		and t4, t4, t0							#t4 = b1
+		bne t4, zero, end_get_input				#if b1 != 0 -> return
+
+		slli t4, t2, 2							#t4 = 0b00100
+		and t4, t4, t0							#t4 = b2
+		bne t4, zero, end_get_input				#if b2 != 0 -> return
+
+		slli t4, t2, 3							#t4 = 0b01000
+		and t4, t4, t0							#t4 = b3
+		bne t4, zero, end_get_input				#if b3 != 0 -> return
+
+		slli t4, t2, 4							#t4 = 0b10000
+		and t4, t4, t0							#t4 = b4
+
+	end_get_input:
+		add v0, zero, t4						#v0 = t4
+		stw zero, BUTTONS+4(zero)
 		ret
 	; END:get_input
 

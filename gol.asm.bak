@@ -491,7 +491,7 @@ main:
 		call set_gsa							#set_gsa(line, y)
 		addi t2, t2, 1							#i = i + 1
 		add t3, zero, zero						#j = 0
-		blt t2, t6								#loop if i < 8
+		blt t2, t6, ug_for						#loop if i < 8
 
 	ug_finish_update:
 		xori t1, zero, 1						#flip t1
@@ -503,6 +503,12 @@ main:
 		addi sp, sp, 4
 		ret
 	; END:update_gsa
+
+    ; BEGIN:mask
+	mask:
+		ldw v0, BUTTONS+4(zero)
+		ret
+	; END:mask
 
     ; BEGIN:get_input
 	get_input:
