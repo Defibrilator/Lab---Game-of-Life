@@ -540,8 +540,47 @@ main:
 	; END:get_input
 
     ; BEGIN:decrement_step
-	decrement_step: #TODO
-		; your implementation code
+	decrement_step: 
+		ldw t0, PAUSE(zero)						#t0 = PAUSE
+		ldw t1, CURR_STATE(zero)				#t1 = CURR_STATE
+		ldw t2, CURR_STEP(zero)					#t2 = CURR_STEP
+		cmpeqi t1, t1, RUN						#t1 = curr_state == run
+		beq t1, zero, ds_ret_zero				#if t1 = false -> display and return 0
+		beq t0, zero, ds_ret_zero				#else if pause == 0 -> display and return 0
+		beq t2, zero, ds_ret_one				#if curr_step == 0 -> return 1
+		addi t2, t2, -1							#decrement curr_step
+		stw t2, CURR_STEP(zero)					#store curr_step
+		br ds_ret_zero							#display and return 0
+		
+	ds_ret_one:
+		addi v0, zero, 1						#v0 = 1
+		br end_decrement_step					#return
+		
+	ds_ret_zero:
+		add v0, zero, zero						#v0 = 0
+
+	display_segs:
+		addi t3, zero, 0xF						#t3 = 0xF
+
+		and t4, t2, t3							#t4 = seven_segs(3)
+		srli t5, t2, 4							#t5 = curr_step >> 4
+		and t5, t5, t3							#t5 = seven_segs(2)
+		srli t6, t2, 8							#curr_step shift right
+		and t6, t6, t3							#t6 = seven_segs(1)
+		srli t7, t2, 12							#curr_step shift right
+		and t7, t7, t3							#t7 = seven_segs(0)
+
+		ldw t4, font_data(t4)					#t4 = display(t4)
+		ldw t5, font_data(t5)					#t5 = display(t5)
+		ldw t6, font_data(t6)					#t6 = display(t6)
+		ldw t7, font_data(t7)					#t7 = display(t7)
+
+		stw t4, SEVEN_SEGS+12(zero)
+		stw t5, SEVEN_SEGS+8(zero)
+		stw t6, SEVEN_SEGS+4(zero)
+		stw t7, SEVEN_SEGS(zero)
+
+	end_decrement_step:
 		ret
 	; END:decrement_step
 
@@ -551,10 +590,11 @@ main:
 		stw ra, 0(sp)
 
 		addi t0, zero, 1						#t0 = 1
-		addi t1, zero, N_GSA_LINES				#t1 = 8
+		ldw t1, font_data+4(zero)				#t1 = display(1)
 		add a1, zero, zero						#a1 = i = 0
 
 		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
+		stw t1, SEVEN_SEGS(zero)				#display 1
 		stw zero, SEED(zero)					#SEED = 0
 		stw zero, PAUSE(zero)					#Game is paused	
 		stw t0, SPEED(zero)						#SPEED = 1
