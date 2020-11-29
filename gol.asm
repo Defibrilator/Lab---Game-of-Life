@@ -108,7 +108,7 @@ main:
 	set_gsa:
 		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
 		slli t1, a1, 2							#t1 = a0 * 4
-		bne t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
+		beq t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
 		stw a0, GSA0(t1)						#store a0 (the line) in correct GSA0 element
 		jmpi end_get_gsa						#return
 	gsa1_set:
@@ -120,8 +120,9 @@ main:
 	#TESTED
 	; BEGIN:draw_gsa
 	draw_gsa:
-		addi sp, sp, -4							#decrement stack pointer
+		addi sp, sp, -8							#decrement stack pointer
 		stw ra, 0(sp)							#add return address to the stack
+		stw s0, 4(sp)							#backup s0
 		
 		call clear_leds
 
@@ -148,6 +149,7 @@ main:
 		addi t6, t6, 1							#i = i + 1
 		blt t6, t1, for_i_draw_gsa				#loop if i < 8
 
+		ldw s0, 4(sp)							#copy s0 back
 		ldw ra, 0(sp)							#copy return address from stack to ra
 		addi sp, sp, 4							#increment stack pointer
 		ret
@@ -155,6 +157,9 @@ main:
 
     ; BEGIN:random_gsa
 	random_gsa:
+		addi sp, sp, -4							#decrement stack pointer
+		stw ra, 0(sp)							#add return address to the stack
+
 		ldw t0, GSA_ID(zero)					#load gsa id
 		addi t2, zero, 0						#j counter for lines
 		addi t3, zero, 0						#i counter for columns
@@ -171,15 +176,15 @@ main:
 		blt t3, t5, for_j_gen_line				#jump to next line 
 		add	a0, zero, t4						#line arg
 		add a1, zero, t2						#y coordinate
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, 0(sp)							#add return address to the stack
 		call set_gsa							#set current finished line
-		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
 		addi t3, zero, 0						#rest i counter
 		addi t2, t2, 1							#j = j + 1
 	if_random_gsa:
 		blt t2, t6, for_i_lines					#jump back if j is less than cols
+
+
+		ldw ra, 0(sp)							#copy return address from stack to ra
+		addi sp, sp, 4							#increment stack pointer
 		ret
 			
 	; END:random_gsa
@@ -330,10 +335,9 @@ main:
 
     ; BEGIN:select_action
 	select_action:
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, 0(sp)							#add s1 to the stack
-		addi sp, sp, -4							#decrement stack pointer
-		stw s1, 0(sp)							#add return address to the stack
+		addi sp, sp, -8							#decrement stack pointer
+		stw ra, 0(sp)							#backup ra in stack
+		stw s1, 4(sp)							#backup s1
 
 		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
 		addi t2, zero, RAND						#t2 = 1
@@ -413,10 +417,9 @@ main:
 
 
 	end_select_action:
-		ldw s1, 0(sp)							#copy return address from stack to s1
-		addi sp, sp, 4							#increment stack pointer
+		ldw s1, 4(sp)							#copy s1 back
 		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
+		addi sp, sp, 8							#increment stack pointer
 		ret
 	; END:select_action
 
@@ -442,7 +445,7 @@ main:
 		br end_cell_fate						#return
 
 	cf_die:
-		addi v0, zero, zero						#v0 = 0
+		add v0, zero, zero						#v0 = 0
 
 	end_cell_fate:
 		ret
@@ -456,7 +459,48 @@ main:
 
     ; BEGIN:update_gsa
 	update_gsa:
-		; your implementation code
+		addi sp, sp, -8
+		stw s0, 0(sp)
+		stw ra, 4(sp)
+
+		ldw t0, PAUSE(zero)						#t0 = GAME_PAUSED
+		ldw t1, GSA_ID(zero)					#t1 = GSA_ID
+		add t2, zero, zero 						#t2 = i = 0 (y)
+		add t3, zero, zero						#t3 = j = 0 (x)
+		addi t5, zero, N_GSA_COLUMNS			#t5 = 12
+		addi t6, zero, N_GSA_LINES				#t6 = 8
+		add s0, zero, zero						#s0 = 0 (the line)
+		beq t0, zero, end_update_gsa			#if (game is paused) -> do nothing
+
+	ug_for:
+		add a0, zero, t3						#a0 = x
+		add a1, zero, t2						#a1 = y
+		call find_neighbours					#find_neighbours(x, y)
+		add a0, zero, v0						#a0 = # of living neighbours
+		add a1, zero, v1						#a1 = state of cell
+		call cell_fate							#cell_fate(x, y)
+		beq zero, v0, ug_skip_activate			#if v0 = 0 skip activation
+		addi t4, zero, 1						#t4 = 1
+		sll t4, t4, t3							#t4 = t4 << x
+		or s0, s0, t4							#add bit to the line
+	ug_skip_activate:
+		addi t3, t3, 1							#j = j + 1
+		blt t3, t5, ug_for						#loop if j < 12
+		add a0, zero, s0						#a0 = the line
+		add a1, zero, t2						#a1 = y
+		call set_gsa							#set_gsa(line, y)
+		addi t2, t2, 1							#i = i + 1
+		add t3, zero, zero						#j = 0
+		blt t2, t6, ug_for						#loop if i < 8
+
+	ug_finish_update:
+		xori t1, zero, 1						#flip t1
+		stw t1, GSA_ID(zero)					#store GSA_ID
+
+	end_update_gsa:
+		ldw s0, 0(sp)
+		ldw ra, 4(sp)
+		addi sp, sp, 4
 		ret
 	; END:update_gsa
 
