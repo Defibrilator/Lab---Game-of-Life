@@ -29,13 +29,7 @@
     .equ RUNNING, 0x01
 	.equ MAX_STEP, 0x1000
 
-main: 
-	addi sp, zero, 0x2000
-	addi a0, zero, 0xFFF
-	addi a1, zero, 1
-	call set_gsa
-	call draw_gsa
-	ret
+main:
 	
 	
 	#TESTED
@@ -97,6 +91,7 @@ main:
 		ret										#return
 	; END:get_gsa
 
+	#TESTED
 	; BEGIN:set_gsa
 	set_gsa:
 		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
@@ -270,11 +265,6 @@ main:
 		jmpi end_update_state					#ret
 	us_init_to_rand:
 		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, 0(sp)							#add return address to the stack
-		call random_gsa							#generate random seed
-		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
 		jmpi end_update_state					#ret
 
 		#RAND
@@ -305,6 +295,7 @@ main:
 	select_action:
 		addi sp, sp, -4							#decrement stack pointer
 		stw ra, 0(sp)							#add return address to the stack
+
 		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
 		addi t2, zero, RAND						#t2 = 1
 		addi t3, zero, RUN						#t3 = 2
@@ -318,8 +309,8 @@ main:
 		slli t1, t2, 4							#t1 = 0b10000
 		and t1, t1, a0							#t1 = b4
 		beq t0, zero, select_init				#update from init
-	#	beq t0, t2, select_rand					#update from rand
-	#nht('é&a	beq t0, t3, select_run					#update from run
+		beq t0, t2, select_rand					#update from rand
+		beq t0, t3, select_run					#update from run
 
 	select_init:
 		bne t4, zero, sa_increment_seed			#if b0 = 1 -> increment seed
@@ -328,6 +319,18 @@ main:
 		or t6, t6, t1							#t6 = t6 or b4
 		bne t6, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
 		br end_select_action					#else do nothing
+
+	select_rand:
+		bne t4, zero, sa_pause_game				#if b0 = 1 -> increment seed
+		bne t5, zero, sa_start_game				#else if b1 = 1 -> start game
+		or t6, t6, t7							#t6 = b2 or b3
+		or t6, t6, t1							#t6 = t6 or b4
+		bne t6, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
+		br end_select_action					#else do nothing
+
+	select_run:
+
+		br end_select_action
 
 	sa_increment_seed:
 		call increment_seed						#increment seed

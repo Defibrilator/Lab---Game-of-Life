@@ -201,8 +201,8 @@ main:
 	; END:pause_game
 		
 		#TESTED
-    ; BEGIN:change_step
-	change_step:
+    ; BEGIN:change_steps
+	change_steps:
 		ldw t0, CURR_STEP(zero)				#load current step size
 		addi t1, zero, MAX_STEP
 		add t0, t0, a0						#add the units
@@ -218,7 +218,7 @@ main:
 		addi t2, zero, 1
 		stw t2, CURR_STEP(zero)				#store 1 because we have overflow
 		ret
-	; END:change_step
+	; END:change_steps
 
     ; BEGIN:increment_seed
 	increment_seed:
@@ -265,11 +265,6 @@ main:
 		jmpi end_update_state					#ret
 	us_init_to_rand:
 		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, 0(sp)							#add return address to the stack
-		call random_gsa							#generate random seed
-		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
 		jmpi end_update_state					#ret
 
 		#RAND
@@ -299,7 +294,10 @@ main:
     ; BEGIN:select_action
 	select_action:
 		addi sp, sp, -4							#decrement stack pointer
-		stw ra, 0(sp)							#add return address to the stack
+		stw ra, 0(sp)							#add s1 to the stack
+		addi sp, sp, -4							#decrement stack pointer
+		stw s1, 0(sp)							#add return address to the stack
+
 		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
 		addi t2, zero, RAND						#t2 = 1
 		addi t3, zero, RUN						#t3 = 2
@@ -313,16 +311,32 @@ main:
 		slli t1, t2, 4							#t1 = 0b10000
 		and t1, t1, a0							#t1 = b4
 		beq t0, zero, select_init				#update from init
-	#	beq t0, t2, select_rand					#update from rand
-	#nht('é&a	beq t0, t3, select_run					#update from run
+		beq t0, t2, select_rand					#update from rand
+		beq t0, t3, select_run					#update from run
 
 	select_init:
 		bne t4, zero, sa_increment_seed			#if b0 = 1 -> increment seed
 		bne t5, zero, sa_start_game				#else if b1 = 1 -> start game
-		or t6, t6, t7							#t6 = b2 or b3
-		or t6, t6, t1							#t6 = t6 or b4
-		bne t6, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
+		or s1, t6, t7							#s1 = b2 or b3
+		or s1, s1, t1							#s1 = s1 or b4
+		bne s1, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
 		br end_select_action					#else do nothing
+
+	select_rand:
+		bne t4, zero, sa_pause_game				#if b0 = 1 -> increment seed
+		bne t5, zero, sa_start_game				#else if b1 = 1 -> start game
+		or s1, t6, t7							#s1 = b2 or b3
+		or s1, s1, t1							#s1 = s1 or b4
+		bne s1, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
+		br end_select_action					#else do nothing
+
+	select_run:
+		bne t4, zero, sa_pause_game				#if b0 = 1 -> pause game
+		bne t5, zero, sa_inc_speed				#else if b1 = 1 -> increase speed
+		bne t6, zero, sa_dec_speed				#if b2 = 1 -> decrease speed
+		bne t7, zero, sa_reset_game				#else if b1 = 1 -> reset game
+		bne t1, zero, sa_random_gsa				#if b0 = 1 -> random gsa		
+		br end_select_action
 
 	sa_increment_seed:
 		call increment_seed						#increment seed
@@ -333,7 +347,10 @@ main:
 		br end_select_action					#return
 		
 	sa_change_step:
-		call change_step						#change_step
+		cmpne a0, t1, zero						#a0 = b4
+		cmpne a1, t7, zero						#a1 = b3
+		cmpne a2, t6, zero						#a1 = b2
+		call change_steps						#change_step
 		br end_select_action					#return
 
 	sa_random_gsa:
@@ -359,6 +376,8 @@ main:
 
 
 	end_select_action:
+		ldw s1, 0(sp)							#copy return address from stack to s1
+		addi sp, sp, 4							#increment stack pointer
 		ldw ra, 0(sp)							#copy return address from stack to ra
 		addi sp, sp, 4							#increment stack pointer
 		ret
@@ -366,7 +385,29 @@ main:
 
     ; BEGIN:cell_fate
 	cell_fate:
-		; your implementation code
+		cmplti t0, a0, 2						#t0 = a0 < 2
+		cmpgei t1, a0, 4						#t1 = a0 > 3
+		or t0, t0, t1							#t0 = (a0 < 2) OR (a0 > 3)
+		and t0, t0, a1							#t0 = t0 and a1
+		bne t0, zero, cf_die					#if t0 = 1 -> cell dies
+		cmpeqi t0, a0, 2						#t0 = (a0 == 2)
+		cmpeqi t1, a0, 3						#t1 = (a0 == 3)
+		or t0, t0, t1							#t0 = (a0 == 2) OR (a0 == 3)
+		xori t2, a1, 1							#t2 = not a1
+		cmpeq t3, t2, t1						#t3 = dead AND t1
+		cmpeq t4, a1, t0						#t4 = alive AND t0
+		or t3, t3, t4							#t3 = t3 OR t4
+		bne t3, zero, cf_live					#if t3 -> cell lives
+		ret										#return
+		
+	cf_live:
+		addi v0, zero, 1						#v0 = 1
+		br end_cell_fate						#return
+
+	cf_die:
+		addi v0, zero, zero						#v0 = 0
+
+	end_cell_fate:
 		ret
 	; END:cell_fate
 
