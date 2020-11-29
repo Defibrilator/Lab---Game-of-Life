@@ -505,7 +505,7 @@ main:
 	; END:update_gsa
 
     ; BEGIN:mask
-	mask:
+	mask: #TODO
 		; your implementation code
 		ret
 	; END:mask
@@ -540,14 +540,58 @@ main:
 	; END:get_input
 
     ; BEGIN:decrement_step
-	decrement_step:
+	decrement_step: #TODO
 		; your implementation code
 		ret
 	; END:decrement_step
 
     ; BEGIN:reset_game
 	reset_game:
-		; your implementation code
+		addi sp, sp, -4
+		stw ra, 0(sp)
+
+		addi t0, zero, 1						#t0 = 1
+		addi t1, zero, N_GSA_LINES				#t1 = 8
+		add a1, zero, zero						#a1 = i = 0
+
+		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
+		stw zero, SEED(zero)					#SEED = 0
+		stw zero, PAUSE(zero)					#Game is paused	
+		stw t0, SPEED(zero)						#SPEED = 1
+
+		#Game state 0 is initialized to the seed 0
+		stw t0, GSA_ID(zero)					#GSA_ID = 1 to init GSA0
+		ldw a0, seed0(zero)
+		call set_gsa
+		ldw a0, seed0+4(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+8(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+12(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+16(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+20(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+24(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+28(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+32(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+
+	end_reset_game:
+		stw zero, GSA_ID(zero)					#GSA_ID = 0
+		ldw ra, 0(sp)
+		addi sp, sp, 4
 		ret
 	; END:reset_game
 

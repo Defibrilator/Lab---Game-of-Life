@@ -505,26 +505,93 @@ main:
 	; END:update_gsa
 
     ; BEGIN:mask
-	mask:
-		ldw v0, BUTTONS+4(zero)
+	mask: #TODO
+		; your implementation code
 		ret
 	; END:mask
 
     ; BEGIN:get_input
 	get_input:
-		; your implementation code
+		ldw t0, BUTTONS+4(zero)
+		addi t2, zero, 1						#t2 = 1
+
+		and t4, t2, t0							#t4 = b0
+		bne t4, zero, end_get_input				#if b0 != 0 -> return
+
+		slli t4, t2, 1							#t4 = 0b00010
+		and t4, t4, t0							#t4 = b1
+		bne t4, zero, end_get_input				#if b1 != 0 -> return
+
+		slli t4, t2, 2							#t4 = 0b00100
+		and t4, t4, t0							#t4 = b2
+		bne t4, zero, end_get_input				#if b2 != 0 -> return
+
+		slli t4, t2, 3							#t4 = 0b01000
+		and t4, t4, t0							#t4 = b3
+		bne t4, zero, end_get_input				#if b3 != 0 -> return
+
+		slli t4, t2, 4							#t4 = 0b10000
+		and t4, t4, t0							#t4 = b4
+
+	end_get_input:
+		add v0, zero, t4						#v0 = t4
+		stw zero, BUTTONS+4(zero)
 		ret
 	; END:get_input
 
     ; BEGIN:decrement_step
-	decrement_step:
+	decrement_step: #TODO
 		; your implementation code
 		ret
 	; END:decrement_step
 
     ; BEGIN:reset_game
 	reset_game:
-		; your implementation code
+		addi sp, sp, -4
+		stw ra, 0(sp)
+
+		addi t0, zero, 1						#t0 = 1
+		addi t1, zero, N_GSA_LINES				#t1 = 8
+		add a1, zero, zero						#a1 = i = 0
+
+		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
+		stw zero, SEED(zero)					#SEED = 0
+		stw zero, PAUSE(zero)					#Game is paused	
+		stw t0, SPEED(zero)						#SPEED = 1
+
+		#Game state 0 is initialized to the seed 0
+		stw t0, GSA_ID(zero)					#GSA_ID = 1 to init GSA0
+		ldw a0, seed0(zero)
+		call set_gsa
+		ldw a0, seed0+4(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+8(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+12(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+16(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+20(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+24(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+28(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+32(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+
+	end_reset_game:
+		stw zero, GSA_ID(zero)					#GSA_ID = 0
+		ldw ra, 0(sp)
+		addi sp, sp, 4
 		ret
 	; END:reset_game
 
