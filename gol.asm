@@ -30,19 +30,34 @@
 	.equ MAX_STEP, 0x1000
 
 main:
+
+############################################    MAIN    ###############################################
+
 	addi sp, zero, 0x2000
-	addi t0, zero, 0
-	stw t0, SEED(zero)
-	call increment_seed
-	call draw_gsa
-	call increment_seed
-	call draw_gsa
-	call increment_seed
-	call draw_gsa 
-	call increment_seed
-	call draw_gsa
-	call increment_seed
-	call draw_gsa
+	
+	GoL:
+		call reset_game
+		call get_input
+		add t0, zero, v0						#t0 = edgecapture
+		add t1, zero, zero						#t1: done = false
+	not_done:
+		add a0, zero, t0
+		call select_action
+		call update_state
+		call update_gsa
+		call mask
+		call draw_gsa
+		call wait
+		call decrement_step
+		add t1, zero, v0						#t1 = done
+		call get_input
+		add t0, zero, v0						#t0 = edgecapture
+		beq t0, zero, not_done					#while !done, loop not_done
+		beq zero, zero, GoL						#while true, loop GoL
+
+	ret
+
+#######################################################################################################
 	
 	#TESTED
 	; BEGIN:clear_leds
