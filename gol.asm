@@ -468,9 +468,67 @@ main:
 		#a0 = x coordinate
 		#a1 = y coordinate
 		#v0 = nb of neighbours
-		#state of the cell in question
+		#v1 = state of the cell in question
+		addi sp, sp, -12
+		stw ra, 0(sp)								#store x in stack
+		stw a1, 4(sp)								#store y in stack
 
+		addi t1, zero, N_GSA_COLUMNS
+		addi t0, zero, 10							#t0 = N_GSA_COLUMNS -2
+		sub t0, t0, a0								#t0 = t0 - x
+		sub t0, t1, t0								#t0 = l - (l-2 - x)
+		stw t0, 8(sp)
 
+		addi a1, a1, -1								#start iteration at y-1
+		addi t4, zero, 0							#j = 0
+		addi t5, zero, 0							#sum = 0		
+		addi t6, zero, 3							#bound for both loops
+		jmpi neighbour_loop
+
+	pre_neigh:
+		addi t4, t4, 1								#j+=1
+		addi a1, a1, 1								#line += 1
+		bge t4, t6, end_neighbours					#end loop if j >= 3
+	neighbour_loop:		
+		add a2, zero, a1							# a2 = y
+		addi a3, zero, 8							# mod 8
+		call mod									#apply modulo
+		add a0, zero, v0							#y coordinate for line
+		call get_gsa
+		ldw a3, 8(sp)								#a3 is now the rotation to get center at (l-2)
+		add a2, zero, v0							#the line in question
+		call custom_rol
+		
+		addi t7, zero, 0							#i = 0
+		
+		ldw t1, 4(sp)
+		bne a1, t1, non_cell_line					#cell line or not
+		
+
+	cell_line:
+		andi t2, v0, 5								#state of side neighbours
+		andi t3, t2, 1								#last cell
+		add t5, t5, t3								#add neighbour to t5 which is the sum of neighbours
+		srli t2, t2, 2								#shift by 2
+		andi t3, t2, 1								#last cell
+		add t5, t5, t3								#add left neighbour
+		andi v1, v0, 2								#mask for the cell state	
+		jmpi pre_neigh
+		
+
+	non_cell_line:
+		andi t3, v0, 1								#last cell
+		add t5, t5, t3								#add neighbour to t5 which is the sum of neighbours
+		srli t2, t2, 1								#shift line by one
+		
+		addi t7, t7, 1								#i += 1
+		bge t7, t6, pre_neigh					#loop it when i!=3
+		jmpi non_cell_line
+		
+	end_neighbours:
+		ldw ra, 0(sp)
+		addi sp, sp, 12
+		add v0, zero, t5							#v0 is total sum t5
 		ret
 	; END:find_neighbours
 
@@ -522,9 +580,51 @@ main:
 	; END:update_gsa
 
     ; BEGIN:mask
-	mask: #TODO
-		; your implementation code
+	mask:
+		addi sp, sp, -4
+		stw ra, 0(sp)
+
+		ldw t0, SEED(zero)						#load current seed
+		slli t0, t0, 2							#t0 * 4 for addressing
+		addi t1, zero, 0						#i = 0
+		addi t2, zero, N_GSA_LINES				#bound by 
+		ldw t3, MASKS(t0)						#t3 has the current mask
+
+	seed_mask:
+		add a0, zero, t1						
+		addi sp, sp, -8
+		stw t0, 0(sp)
+		stw t1, 4(sp)
+		call get_gsa							#get line i
+		ldw t1, 4(sp)
+		ldw t0, 0(sp)
+		addi sp, sp, 8	
+
+		slli t1, t1, 2							#t1 * 4 for addressing
+
+		ldw t4, 0(t3)							#t4 has the current maks line
+		srli t1, t1, 2							#go back to i for t1
+
+		and a0, v0, t4							#apply the mask
+		add a1, zero, t1						#set y coordinate
+		addi sp, sp, -8
+		stw t0, 0(sp)
+		stw t1, 4(sp)
+		call set_gsa							#set the newly masked line
+		ldw t1, 4(sp)
+		ldw t0, 0(sp)
+		addi sp, sp, 8		
+
+		addi t3, t3, 4							#increment t3 by 4
+		addi t1, t1, 1							#i+=1 and loop
+		blt t1, t2, seed_mask					#loop if i < N_GSA_LINES
+	
+	end_mask:
+		ldw ra, 0(sp)
+		addi sp, sp, 4
 		ret
+		
+
 	; END:mask
 
     ; BEGIN:get_input
@@ -661,16 +761,50 @@ main:
 	.equ MAX_STEP, 0x1000
 
 	mod:
-		blt a0, zero, negative			#procedure for negatives
-		blt a0, a1, end_mod				#end condition
-		sub a0, a0, a1					#a=a-mod
+		addi sp, sp, -4
+		stw ra, 0(sp)
+
+		blt a2, zero, negative			#procedure for negatives
+		blt a2, a3, end_mod				#end condition
+		sub a2, a2, a3					#a=a-mod                      mod is a3
 		jmpi mod						#loop it
 	negative:
-		bge a0, zero, end_mod			#a>=0  -> end
-		add a0, a0, a1					#a=a+mod
+		bge a2, zero, end_mod			#a>=0  -> end
+		add a2, a2, a3					#a=a+mod
 		jmpi negative
 	end_mod:
-		add v0, zero, a0				#return a0 mod a1
+		add v0, zero, a2				#return a0 mod a1
+		ldw ra, 0(sp)
+		addi sp, sp, 4
+		ret
+
+	custom_rol:
+		#a2 the line
+		#a3 the shift
+		addi sp, sp, -4
+		stw ra, 0(sp)
+	lil_loop:
+	#	slli a2, a2, 1
+		#addi a0, zero, 1
+		#slli a0, a0, 12
+		#and a0, a0, a2
+		#srli a0, a0, 12
+		#andi a2, a2, 0xFFF
+		#add v0, a2, a0 
+		addi a0, zero, 1
+		ror a2, a2, a0
+		srli a0, a0, 31
+		and a0, a0, a2
+		slli a0, a0, 8
+		add v0, a2, a0
+
+		
+
+		addi a3, a3, -1
+		bne a3, zero, lil_loop
+
+		ldw ra, 0(sp)
+		addi sp, sp, 4
 		ret
 	;END:helper
 
