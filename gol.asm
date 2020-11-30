@@ -503,7 +503,6 @@ main:
 		
 		ldw t1, 4(sp)
 		bne a1, t1, non_cell_line					#cell line or not
-		
 
 	cell_line:
 		andi t2, v0, 5								#state of side neighbours
@@ -515,14 +514,13 @@ main:
 		andi v1, v0, 2								#mask for the cell state	
 		jmpi pre_neigh
 		
-
 	non_cell_line:
 		andi t3, v0, 1								#last cell
 		add t5, t5, t3								#add neighbour to t5 which is the sum of neighbours
 		srli t2, t2, 1								#shift line by one
 		
 		addi t7, t7, 1								#i += 1
-		bge t7, t6, pre_neigh					#loop it when i!=3
+		bge t7, t6, pre_neigh						#loop it when i!=3
 		jmpi non_cell_line
 		
 	end_neighbours:
@@ -783,25 +781,19 @@ main:
 		#a3 the shift
 		addi sp, sp, -4
 		stw ra, 0(sp)
+		add t0, zero, a2
+		add t1, zero, a3
 	lil_loop:
-	#	slli a2, a2, 1
-		#addi a0, zero, 1
-		#slli a0, a0, 12
-		#and a0, a0, a2
-		#srli a0, a0, 12
-		#andi a2, a2, 0xFFF
-		#add v0, a2, a0 
-		addi a0, zero, 1
-		ror a2, a2, a0
-		srli a0, a0, 31
-		and a0, a0, a2
-		slli a0, a0, 8
-		add v0, a2, a0
+		addi t2, zero, 1
+		srli t2, t2, 31
+		ror t0, t0, t2
+		and t2, t2, t0
+		srli t2, t2, 12
+		add t6, t0, t2
+		andi v0, t6, 0xFFF
 
-		
-
-		addi a3, a3, -1
-		bne a3, zero, lil_loop
+		addi t1, t1, -1
+		bne t1, zero, lil_loop
 
 		ldw ra, 0(sp)
 		addi sp, sp, 4
