@@ -27,13 +27,11 @@
     .equ MIN_SPEED, 1
     .equ PAUSED, 0x00
     .equ RUNNING, 0x01
-	.equ MAX_STEP, 0x1000
 
-main:
 
 ############################################    MAIN    ###############################################
-
-	addi sp, zero, 0x2000
+main:
+	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
 	
 	GoL:
 		call reset_game
@@ -62,11 +60,9 @@ main:
 	#TESTED
 	; BEGIN:clear_leds
 	clear_leds:
-		addi t3, zero, 4						#init t3 to 4
-		addi t4, zero, 8						#init t4 to 8
 		stw zero, LEDS(zero)
-		stw zero, LEDS(t3)
-		stw zero, LEDS(t4)
+		stw zero, LEDS+4(zero)
+		stw zero, LEDS+8(zero)
 		ret
 	; END:clear_leds
 
@@ -111,7 +107,7 @@ main:
 		slli t1, a0, 2							#t1 = a0 * 4
 		bne t0, zero, gsa1_get					#if the current gsa is 1 go to gsa1_get
 		ldw v0, GSA0(t1)						#load GSA0(t1) in v0
-		jmpi end_get_gsa						#return
+		br end_get_gsa							#return
 	gsa1_get:
 		ldw v0, GSA1(t1)						#load GSA1(t1) in v0
 	end_get_gsa:
@@ -125,7 +121,7 @@ main:
 		slli t1, a1, 2							#t1 = a0 * 4
 		beq t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
 		stw a0, GSA0(t1)						#store a0 (the line) in correct GSA0 element
-		jmpi end_get_gsa						#return
+		br end_set_gsa							#return
 	gsa1_set:
 		stw a0, GSA1(t1)						#store t1 (the line) in correct GSA1 element
 	end_set_gsa:
@@ -166,7 +162,7 @@ main:
 
 		ldw s0, 4(sp)							#copy s0 back
 		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
+		addi sp, sp, 8							#increment stack pointer
 		ret
 	; END:draw_gsa
 
@@ -258,6 +254,7 @@ main:
 	increment_seed:
 		addi sp, sp ,-4
 		stw ra, 0(sp)
+
 		ldw t0, SEED(zero)						#load seed in t0
 		addi t0, t0, 1							#increment by 1
 		addi t1, zero, N_SEEDS
@@ -315,23 +312,23 @@ main:
 		ldw t5, N_SEEDS(zero)					#t5 = N_SEEDS
 		beq t6, t2, us_init_to_run				#if b1 = 1 -> change state to run
 		beq t4, t5, us_init_to_rand				#else if b0 = N -> change state to rand
-		jmpi end_update_state					#else ret
+		br end_update_state						#else ret
 	us_init_to_run:
 		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
 		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 	us_init_to_rand:
 		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 
 		#RAND
 	update_state_rand:
 		beq t6, t2, us_rand_to_run				#if b1 = 1 -> change to run
-		jmpi end_update_state					#else stay on rand
+		br end_update_state						#else stay on rand
 	us_rand_to_run:
 		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
 		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 
 		#RUN
 	update_state_run:
@@ -515,7 +512,7 @@ main:
 	end_update_gsa:
 		ldw s0, 0(sp)
 		ldw ra, 4(sp)
-		addi sp, sp, 4
+		addi sp, sp, 8
 		ret
 	; END:update_gsa
 
@@ -606,10 +603,15 @@ main:
 
 		addi t0, zero, 1						#t0 = 1
 		ldw t1, font_data+4(zero)				#t1 = display(1)
+		ldw t2, font_data(zero)					#t2 = display(0)
 		add a1, zero, zero						#a1 = i = 0
 
+		stw t1, SEVEN_SEGS+12(zero)
+		stw t2, SEVEN_SEGS+8(zero)
+		stw t2, SEVEN_SEGS+4(zero)
+		stw t2, SEVEN_SEGS(zero)				#display 0001
+
 		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
-		stw t1, SEVEN_SEGS(zero)				#display 1
 		stw zero, SEED(zero)					#SEED = 0
 		stw zero, PAUSE(zero)					#Game is paused	
 		stw t0, SPEED(zero)						#SPEED = 1
@@ -651,6 +653,8 @@ main:
 	; END:reset_game
 
 	;BEGIN:helper
+	.equ MAX_STEP, 0x1000
+
 	mod:
 		blt a0, a1, end_mod
 		sub a0, a0, a1
