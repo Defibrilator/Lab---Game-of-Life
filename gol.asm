@@ -32,7 +32,12 @@
 ############################################    MAIN    ###############################################
 main:
 	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
-	
+	addi s0, zero, 1
+	stw s0, SEED(zero)
+	call draw_gsa
+	addi a0, zero, 2
+	addi a1, zero, 0
+	call find_neighbours
 	GoL:
 		call reset_game
 		call get_input
@@ -474,9 +479,12 @@ main:
 		stw a1, 4(sp)								#store y in stack
 
 		addi t1, zero, N_GSA_COLUMNS
-		addi t0, zero, 10							#t0 = N_GSA_COLUMNS -2
-		sub t0, t0, a0								#t0 = t0 - x
-		sub t0, t1, t0								#t0 = l - (l-2 - x)
+		addi t0, a0, -1								#t0 = x-1
+		bge t0, zero, start_nei						
+	minus_rol:
+		addi t0, t1, -1
+		jmpi start_nei	
+	start_nei:
 		stw t0, 8(sp)
 
 		addi a1, a1, -1								#start iteration at y-1
@@ -498,6 +506,7 @@ main:
 		ldw a3, 8(sp)								#a3 is now the rotation to get center at (l-2)
 		add a2, zero, v0							#the line in question
 		call custom_rol
+		addi t6, zero, 3
 		
 		addi t7, zero, 0							#i = 0
 		
