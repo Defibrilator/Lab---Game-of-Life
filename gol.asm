@@ -27,31 +27,42 @@
     .equ MIN_SPEED, 1
     .equ PAUSED, 0x00
     .equ RUNNING, 0x01
-	.equ MAX_STEP, 0x1000
 
+
+############################################    MAIN    ###############################################
 main:
-	addi sp, zero, 0x2000
-	addi t0, zero, 0
-	stw t0, SEED(zero)
-	call increment_seed
-	call draw_gsa
-	call increment_seed
-	call draw_gsa
-	call increment_seed
-	call draw_gsa 
-	call increment_seed
-	call draw_gsa
-	call increment_seed
-	call draw_gsa
+	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
+	
+	GoL:
+		call reset_game
+		call get_input
+		add t0, zero, v0						#t0 = edgecapture
+		add t1, zero, zero						#t1: done = false
+	not_done:
+		add a0, zero, t0
+		call select_action
+		call update_state
+		call update_gsa
+		call mask
+		call draw_gsa
+		call wait
+		call decrement_step
+		add t1, zero, v0						#t1 = done
+		call get_input
+		add t0, zero, v0						#t0 = edgecapture
+		beq t0, zero, not_done					#while !done, loop not_done
+		beq zero, zero, GoL						#while true, loop GoL
+
+	ret
+
+#######################################################################################################
 	
 	#TESTED
 	; BEGIN:clear_leds
 	clear_leds:
-		addi t3, zero, 4						#init t3 to 4
-		addi t4, zero, 8						#init t4 to 8
 		stw zero, LEDS(zero)
-		stw zero, LEDS(t3)
-		stw zero, LEDS(t4)
+		stw zero, LEDS+4(zero)
+		stw zero, LEDS+8(zero)
 		ret
 	; END:clear_leds
 
@@ -96,7 +107,7 @@ main:
 		slli t1, a0, 2							#t1 = a0 * 4
 		bne t0, zero, gsa1_get					#if the current gsa is 1 go to gsa1_get
 		ldw v0, GSA0(t1)						#load GSA0(t1) in v0
-		jmpi end_get_gsa						#return
+		br end_get_gsa							#return
 	gsa1_get:
 		ldw v0, GSA1(t1)						#load GSA1(t1) in v0
 	end_get_gsa:
@@ -108,9 +119,9 @@ main:
 	set_gsa:
 		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
 		slli t1, a1, 2							#t1 = a0 * 4
-		bne t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
+		beq t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
 		stw a0, GSA0(t1)						#store a0 (the line) in correct GSA0 element
-		jmpi end_get_gsa						#return
+		br end_set_gsa							#return
 	gsa1_set:
 		stw a0, GSA1(t1)						#store t1 (the line) in correct GSA1 element
 	end_set_gsa:
@@ -120,8 +131,9 @@ main:
 	#TESTED
 	; BEGIN:draw_gsa
 	draw_gsa:
-		addi sp, sp, -4							#decrement stack pointer
+		addi sp, sp, -8							#decrement stack pointer
 		stw ra, 0(sp)							#add return address to the stack
+		stw s0, 4(sp)							#backup s0
 		
 		call clear_leds
 
@@ -148,13 +160,17 @@ main:
 		addi t6, t6, 1							#i = i + 1
 		blt t6, t1, for_i_draw_gsa				#loop if i < 8
 
+		ldw s0, 4(sp)							#copy s0 back
 		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
+		addi sp, sp, 8							#increment stack pointer
 		ret
 	; END:draw_gsa
 
     ; BEGIN:random_gsa
 	random_gsa:
+		addi sp, sp, -4							#decrement stack pointer
+		stw ra, 0(sp)							#add return address to the stack
+
 		ldw t0, GSA_ID(zero)					#load gsa id
 		addi t2, zero, 0						#j counter for lines
 		addi t3, zero, 0						#i counter for columns
@@ -171,15 +187,15 @@ main:
 		blt t3, t5, for_j_gen_line				#jump to next line 
 		add	a0, zero, t4						#line arg
 		add a1, zero, t2						#y coordinate
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, 0(sp)							#add return address to the stack
 		call set_gsa							#set current finished line
-		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
 		addi t3, zero, 0						#rest i counter
 		addi t2, t2, 1							#j = j + 1
 	if_random_gsa:
 		blt t2, t6, for_i_lines					#jump back if j is less than cols
+
+
+		ldw ra, 0(sp)							#copy return address from stack to ra
+		addi sp, sp, 4							#increment stack pointer
 		ret
 			
 	; END:random_gsa
@@ -215,8 +231,8 @@ main:
 	; END:pause_game
 		
 		#TESTED
-    ; BEGIN:change_step
-	change_step:
+    ; BEGIN:change_steps
+	change_steps:
 		ldw t0, CURR_STEP(zero)				#load current step size
 		addi t1, zero, MAX_STEP
 		add t0, t0, a0						#add the units
@@ -232,12 +248,13 @@ main:
 		addi t2, zero, 1
 		stw t2, CURR_STEP(zero)				#store 1 because we have overflow
 		ret
-	; END:change_step
+	; END:change_steps
 
     ; BEGIN:increment_seed
 	increment_seed:
 		addi sp, sp ,-4
 		stw ra, 0(sp)
+
 		ldw t0, SEED(zero)						#load seed in t0
 		addi t0, t0, 1							#increment by 1
 		addi t1, zero, N_SEEDS
@@ -295,28 +312,23 @@ main:
 		ldw t5, N_SEEDS(zero)					#t5 = N_SEEDS
 		beq t6, t2, us_init_to_run				#if b1 = 1 -> change state to run
 		beq t4, t5, us_init_to_rand				#else if b0 = N -> change state to rand
-		jmpi end_update_state					#else ret
+		br end_update_state						#else ret
 	us_init_to_run:
 		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
 		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 	us_init_to_rand:
 		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, 0(sp)							#add return address to the stack
-		call random_gsa							#generate random seed
-		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 
 		#RAND
 	update_state_rand:
 		beq t6, t2, us_rand_to_run				#if b1 = 1 -> change to run
-		jmpi end_update_state					#else stay on rand
+		br end_update_state						#else stay on rand
 	us_rand_to_run:
 		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
 		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 
 		#RUN
 	update_state_run:
@@ -335,8 +347,10 @@ main:
 
     ; BEGIN:select_action
 	select_action:
-		addi sp, sp, -4							#decrement stack pointer
-		stw ra, 0(sp)							#add return address to the stack
+		addi sp, sp, -8							#decrement stack pointer
+		stw ra, 0(sp)							#backup ra in stack
+		stw s1, 4(sp)							#backup s1
+
 		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
 		addi t2, zero, RAND						#t2 = 1
 		addi t3, zero, RUN						#t3 = 2
@@ -350,16 +364,32 @@ main:
 		slli t1, t2, 4							#t1 = 0b10000
 		and t1, t1, a0							#t1 = b4
 		beq t0, zero, select_init				#update from init
-	#	beq t0, t2, select_rand					#update from rand
-	#nht('é&a	beq t0, t3, select_run					#update from run
+		beq t0, t2, select_rand					#update from rand
+		beq t0, t3, select_run					#update from run
 
 	select_init:
 		bne t4, zero, sa_increment_seed			#if b0 = 1 -> increment seed
 		bne t5, zero, sa_start_game				#else if b1 = 1 -> start game
-		or t6, t6, t7							#t6 = b2 or b3
-		or t6, t6, t1							#t6 = t6 or b4
-		bne t6, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
+		or s1, t6, t7							#s1 = b2 or b3
+		or s1, s1, t1							#s1 = s1 or b4
+		bne s1, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
 		br end_select_action					#else do nothing
+
+	select_rand:
+		bne t4, zero, sa_pause_game				#if b0 = 1 -> increment seed
+		bne t5, zero, sa_start_game				#else if b1 = 1 -> start game
+		or s1, t6, t7							#s1 = b2 or b3
+		or s1, s1, t1							#s1 = s1 or b4
+		bne s1, zero, sa_change_step			#else if b2 or b3 or b4 = 1 -> change_step
+		br end_select_action					#else do nothing
+
+	select_run:
+		bne t4, zero, sa_pause_game				#if b0 = 1 -> pause game
+		bne t5, zero, sa_inc_speed				#else if b1 = 1 -> increase speed
+		bne t6, zero, sa_dec_speed				#if b2 = 1 -> decrease speed
+		bne t7, zero, sa_reset_game				#else if b1 = 1 -> reset game
+		bne t1, zero, sa_random_gsa				#if b0 = 1 -> random gsa		
+		br end_select_action
 
 	sa_increment_seed:
 		call increment_seed						#increment seed
@@ -370,7 +400,10 @@ main:
 		br end_select_action					#return
 		
 	sa_change_step:
-		call change_step						#change_step
+		cmpne a0, t1, zero						#a0 = b4
+		cmpne a1, t7, zero						#a1 = b3
+		cmpne a2, t6, zero						#a1 = b2
+		call change_steps						#change_step
 		br end_select_action					#return
 
 	sa_random_gsa:
@@ -396,14 +429,37 @@ main:
 
 
 	end_select_action:
+		ldw s1, 4(sp)							#copy s1 back
 		ldw ra, 0(sp)							#copy return address from stack to ra
-		addi sp, sp, 4							#increment stack pointer
+		addi sp, sp, 8							#increment stack pointer
 		ret
 	; END:select_action
 
     ; BEGIN:cell_fate
 	cell_fate:
-		; your implementation code
+		cmplti t0, a0, 2						#t0 = a0 < 2
+		cmpgei t1, a0, 4						#t1 = a0 > 3
+		or t0, t0, t1							#t0 = (a0 < 2) OR (a0 > 3)
+		and t0, t0, a1							#t0 = t0 and a1
+		bne t0, zero, cf_die					#if t0 = 1 -> cell dies
+		cmpeqi t0, a0, 2						#t0 = (a0 == 2)
+		cmpeqi t1, a0, 3						#t1 = (a0 == 3)
+		or t0, t0, t1							#t0 = (a0 == 2) OR (a0 == 3)
+		xori t2, a1, 1							#t2 = not a1
+		cmpeq t3, t2, t1						#t3 = dead AND t1
+		cmpeq t4, a1, t0						#t4 = alive AND t0
+		or t3, t3, t4							#t3 = t3 OR t4
+		bne t3, zero, cf_live					#if t3 -> cell lives
+		ret										#return
+		
+	cf_live:
+		addi v0, zero, 1						#v0 = 1
+		br end_cell_fate						#return
+
+	cf_die:
+		add v0, zero, zero						#v0 = 0
+
+	end_cell_fate:
 		ret
 	; END:cell_fate
 
@@ -420,29 +476,190 @@ main:
 
     ; BEGIN:update_gsa
 	update_gsa:
-		; your implementation code
+		addi sp, sp, -8
+		stw s0, 0(sp)
+		stw ra, 4(sp)
+
+		ldw t0, PAUSE(zero)						#t0 = GAME_PAUSED
+		ldw t1, GSA_ID(zero)					#t1 = GSA_ID
+		add t2, zero, zero 						#t2 = i = 0 (y)
+		add t3, zero, zero						#t3 = j = 0 (x)
+		addi t5, zero, N_GSA_COLUMNS			#t5 = 12
+		addi t6, zero, N_GSA_LINES				#t6 = 8
+		add s0, zero, zero						#s0 = 0 (the line)
+		beq t0, zero, end_update_gsa			#if (game is paused) -> do nothing
+
+	ug_for:
+		add a0, zero, t3						#a0 = x
+		add a1, zero, t2						#a1 = y
+		call find_neighbours					#find_neighbours(x, y)
+		add a0, zero, v0						#a0 = # of living neighbours
+		add a1, zero, v1						#a1 = state of cell
+		call cell_fate							#cell_fate(x, y)
+		beq zero, v0, ug_skip_activate			#if v0 = 0 skip activation
+		addi t4, zero, 1						#t4 = 1
+		sll t4, t4, t3							#t4 = t4 << x
+		or s0, s0, t4							#add bit to the line
+	ug_skip_activate:
+		addi t3, t3, 1							#j = j + 1
+		blt t3, t5, ug_for						#loop if j < 12
+		add a0, zero, s0						#a0 = the line
+		add a1, zero, t2						#a1 = y
+		call set_gsa							#set_gsa(line, y)
+		addi t2, t2, 1							#i = i + 1
+		add t3, zero, zero						#j = 0
+		blt t2, t6, ug_for						#loop if i < 8
+
+	ug_finish_update:
+		xori t1, zero, 1						#flip t1
+		stw t1, GSA_ID(zero)					#store GSA_ID
+
+	end_update_gsa:
+		ldw s0, 0(sp)
+		ldw ra, 4(sp)
+		addi sp, sp, 8
 		ret
 	; END:update_gsa
 
+    ; BEGIN:mask
+	mask: #TODO
+		; your implementation code
+		ret
+	; END:mask
+
     ; BEGIN:get_input
 	get_input:
-		; your implementation code
+		ldw t0, BUTTONS+4(zero)
+		addi t2, zero, 1						#t2 = 1
+
+		and t4, t2, t0							#t4 = b0
+		bne t4, zero, end_get_input				#if b0 != 0 -> return
+
+		slli t4, t2, 1							#t4 = 0b00010
+		and t4, t4, t0							#t4 = b1
+		bne t4, zero, end_get_input				#if b1 != 0 -> return
+
+		slli t4, t2, 2							#t4 = 0b00100
+		and t4, t4, t0							#t4 = b2
+		bne t4, zero, end_get_input				#if b2 != 0 -> return
+
+		slli t4, t2, 3							#t4 = 0b01000
+		and t4, t4, t0							#t4 = b3
+		bne t4, zero, end_get_input				#if b3 != 0 -> return
+
+		slli t4, t2, 4							#t4 = 0b10000
+		and t4, t4, t0							#t4 = b4
+
+	end_get_input:
+		add v0, zero, t4						#v0 = t4
+		stw zero, BUTTONS+4(zero)
 		ret
 	; END:get_input
 
     ; BEGIN:decrement_step
-	decrement_step:
-		; your implementation code
+	decrement_step: 
+		ldw t0, PAUSE(zero)						#t0 = PAUSE
+		ldw t1, CURR_STATE(zero)				#t1 = CURR_STATE
+		ldw t2, CURR_STEP(zero)					#t2 = CURR_STEP
+		cmpeqi t1, t1, RUN						#t1 = curr_state == run
+		beq t1, zero, ds_ret_zero				#if t1 = false -> display and return 0
+		beq t0, zero, ds_ret_zero				#else if pause == 0 -> display and return 0
+		beq t2, zero, ds_ret_one				#if curr_step == 0 -> return 1
+		addi t2, t2, -1							#decrement curr_step
+		stw t2, CURR_STEP(zero)					#store curr_step
+		br ds_ret_zero							#display and return 0
+		
+	ds_ret_one:
+		addi v0, zero, 1						#v0 = 1
+		br end_decrement_step					#return
+		
+	ds_ret_zero:
+		add v0, zero, zero						#v0 = 0
+
+	display_segs:
+		addi t3, zero, 0xF						#t3 = 0xF
+
+		and t4, t2, t3							#t4 = seven_segs(3)
+		srli t5, t2, 4							#t5 = curr_step >> 4
+		and t5, t5, t3							#t5 = seven_segs(2)
+		srli t6, t2, 8							#curr_step shift right
+		and t6, t6, t3							#t6 = seven_segs(1)
+		srli t7, t2, 12							#curr_step shift right
+		and t7, t7, t3							#t7 = seven_segs(0)
+
+		ldw t4, font_data(t4)					#t4 = display(t4)
+		ldw t5, font_data(t5)					#t5 = display(t5)
+		ldw t6, font_data(t6)					#t6 = display(t6)
+		ldw t7, font_data(t7)					#t7 = display(t7)
+
+		stw t4, SEVEN_SEGS+12(zero)
+		stw t5, SEVEN_SEGS+8(zero)
+		stw t6, SEVEN_SEGS+4(zero)
+		stw t7, SEVEN_SEGS(zero)
+
+	end_decrement_step:
 		ret
 	; END:decrement_step
 
     ; BEGIN:reset_game
 	reset_game:
-		; your implementation code
+		addi sp, sp, -4
+		stw ra, 0(sp)
+
+		addi t0, zero, 1						#t0 = 1
+		ldw t1, font_data+4(zero)				#t1 = display(1)
+		ldw t2, font_data(zero)					#t2 = display(0)
+		add a1, zero, zero						#a1 = i = 0
+
+		stw t1, SEVEN_SEGS+12(zero)
+		stw t2, SEVEN_SEGS+8(zero)
+		stw t2, SEVEN_SEGS+4(zero)
+		stw t2, SEVEN_SEGS(zero)				#display 0001
+
+		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
+		stw zero, SEED(zero)					#SEED = 0
+		stw zero, PAUSE(zero)					#Game is paused	
+		stw t0, SPEED(zero)						#SPEED = 1
+
+		#Game state 0 is initialized to the seed 0
+		stw t0, GSA_ID(zero)					#GSA_ID = 1 to init GSA0
+		ldw a0, seed0(zero)
+		call set_gsa
+		ldw a0, seed0+4(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+8(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+12(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+16(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+20(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+24(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+28(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+		ldw a0, seed0+32(zero)
+		addi a1, a1, 1							#a1 = a1 + 1
+		call set_gsa
+
+	end_reset_game:
+		stw zero, GSA_ID(zero)					#GSA_ID = 0
+		ldw ra, 0(sp)
+		addi sp, sp, 4
 		ret
 	; END:reset_game
 
 	;BEGIN:helper
+	.equ MAX_STEP, 0x1000
+
 	mod:
 		blt a0, zero, negative			#procedure for negatives
 		blt a0, a1, end_mod				#end condition
