@@ -1,3 +1,4 @@
+
     ;; game state memory location
     .equ CURR_STATE, 0x1000        ; current game state
     .equ GSA_ID, 0x1004            ; gsa currently in use for drawing
@@ -32,11 +33,6 @@
 ############################################    MAIN    ###############################################
 main:
 	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
-
-	call update_gsa
-	call draw_gsa
-
-	ret
 
 	GoL:
 		call reset_game
@@ -199,8 +195,8 @@ main:
 		
 		ldw ra, 0(sp)							#copy return address from stack to ra
 		addi sp, sp, 4							#increment stack pointer
-		ret
-			
+		ret		
+		
 	; END:random_gsa
 
 		#TESTED
@@ -297,7 +293,7 @@ main:
 		ret
 	; END:increment_seed
 		
-	#TESTED
+#TESTED
 	; BEGIN:update_state
 	update_state:
 		addi sp, sp, -4
@@ -449,14 +445,12 @@ main:
 		addi sp, sp, 8							#increment stack pointer
 		ret
 	; END:select_action
-
-	#TESTED
     ; BEGIN:cell_fate
 	cell_fate:
 		addi t0, zero, 2
 		addi t1, zero, 3
 		addi t2, zero, 4
-		bne a1, zero, cf_is_alive						#if a1 != 0 -> is_alive else is_dead
+		bne a1, zero, cf_is_alive					#if a1 != 0 -> is_alive else is_dead
 	
 	cf_is_dead:
 		beq a0, t1, cf_change_state					#if dead and 3 neighbours -> change state
@@ -579,7 +573,6 @@ main:
 		add a0, zero, v0						#a0 = # of living neighbours
 		add a1, zero, v1						#a1 = state of cell
 		call cell_fate							#cell_fate(x, y)
-
 		ldw t0, 0(sp)
 		ldw t1, 4(sp)
 		ldw t2, 8(sp)
@@ -703,7 +696,7 @@ main:
     ; BEGIN:decrement_step
 	decrement_step: 
 		ldw t0, PAUSE(zero)						#t0 = PAUSE
-		beq t0, zero, ds_ret_zero				#pause == 0 -> display and return 0
+		beq t0, zero, ds_ret_zero				#else if pause == 0 -> display and return 0
 		ldw t1, CURR_STATE(zero)				#t1 = CURR_STATE
 		ldw t2, CURR_STEP(zero)					#t2 = CURR_STEP
 		cmpeqi t1, t1, RUN						#t1 = curr_state == run
@@ -755,9 +748,9 @@ main:
 		addi sp, sp, -4
 		stw ra, 0(sp)
 
+		addi t0, zero, 1						#t0 = 1
 		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
 
-		addi t0, zero, 1						#t0 = 1
 		ldw t1, font_data+4(zero)				#t1 = display(1)
 		ldw t2, font_data(zero)					#t2 = display(0)
 		add a1, zero, zero						#a1 = i = 0
@@ -796,6 +789,9 @@ main:
 		ldw a0, seed0+28(zero)
 		addi a1, a1, 1							#a1 = a1 + 1
 		call set_gsa
+		
+		call mask
+		call draw_gsa
 
 	end_reset_game:
 		ldw ra, 0(sp)
