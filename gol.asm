@@ -461,7 +461,7 @@ main:
 	end_cell_fate:
 		ret
 	; END:cell_fate
-
+	#TESTED
     ; BEGIN:find_neighbours
 	find_neighbours:
 		#a0 = x coordinate
