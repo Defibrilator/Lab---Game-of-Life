@@ -33,7 +33,7 @@
 main:
 	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
 
-	call decrement_step
+	call update_state
 	ret
 
 	GoL:
@@ -295,15 +295,18 @@ main:
 		ret
 	; END:increment_seed
 		
-#TODO
+	#TESTED
 	; BEGIN:update_state
 	update_state:
+		addi sp, sp, -4
+		stw ra, 0(sp)
+
 		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
 		addi t1, zero, INIT						#t1 = 0
 		addi t2, zero, RAND						#t2 = 1
 		addi t3, zero, RUN						#t3 = 2
 		addi t6, zero, 1						#t6 = 1
-		slli t6, zero, 1						#t6 = 0b10
+		slli t6, t6, 1							#t6 = 0b10
 		and t6, t6, a0							#t6 = b1
 		beq t0, t1, update_state_init			#update from init
 		beq t0, t2, update_state_rand			#update from rand
@@ -312,9 +315,9 @@ main:
 		#INIT
 	update_state_init:
 		ldw t4, SEED(zero) 						#t4 = SEED
-		ldw t5, N_SEEDS(zero)					#t5 = N_SEEDS
-		beq t4, t5, us_init_to_rand				#else if b0 = N -> change state to rand
-		beq t6, t2, us_init_to_run				#if b1 = 1 -> change state to run
+		addi t5, zero, N_SEEDS					#t5 = N_SEEDS
+		beq t4, t5, us_init_to_rand				#if b0 = N -> change state to rand
+		bne t6, zero, us_init_to_run			#else if b1 != 1 -> change state to run
 		br end_update_state						#else ret
 	us_init_to_run:
 		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
@@ -327,8 +330,8 @@ main:
 		#RAND
 	update_state_rand:
 		andi t4, a0, 1							#t4 = b0
-		bne t4, zero, end_update_state			#press b0 when in rand state do nothing		 
-		beq t6, t2, us_rand_to_run				#if b1 = 1 -> change to run
+		bne t4, zero, end_update_state			#if b0 = 1 -> do nothing		 
+		bne t6, zero, us_rand_to_run			#if b1 != 0 -> change to run
 		br end_update_state						#else stay on rand
 	us_rand_to_run:
 		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
@@ -338,15 +341,20 @@ main:
 		#RUN
 	update_state_run:
 		addi t6, zero, 1						#t6 = 1
-		slli t6, zero, 3						#t6 = 0b1000
+		slli t6, t6, 3							#t6 = 0b1000
 		and t6, t6, a0							#t6 = b3
-		bne t6, t2, end_update_state			#if b3 != 1 -> do nothing
+		bne t6, zero, us_run_to_init			#if b3 != 0 -> change to init
 		ldw t0, CURR_STEP(zero)					#t0 = CURR_STEP
-		ldw t4, MAX_STEP(zero)					#t4 = MAX_STEP
-		blt t0, t4, end_update_state			#if CURR_STEP < MAX_STEP -> do nothing
-		stw t1, CURR_STATE(zero)				#else CURR_STATE = INIT	
+		addi t4, zero, MAX_STEP					#t4 = MAX_STEP
+		bge t0, t4, us_run_to_init				#else if CURR_STEP >= MAX_STEP -> change to init
+		br end_update_state						#else return
+	us_run_to_init:
+		stw t1, CURR_STATE(zero)				#else CURR_STATE = INIT
+		call reset_game							#reset game
 		
 	end_update_state:
+		ldw ra, 0(sp)
+		addi sp, sp, 4
 		ret
 	; END:update_state
 
@@ -392,8 +400,8 @@ main:
 		bne t4, zero, sa_pause_game				#if b0 = 1 -> pause game
 		bne t5, zero, sa_inc_speed				#else if b1 = 1 -> increase speed
 		bne t6, zero, sa_dec_speed				#if b2 = 1 -> decrease speed
-		bne t7, zero, sa_reset_game				#else if b1 = 1 -> reset game
-		bne t1, zero, sa_random_gsa				#if b0 = 1 -> random gsa		
+		bne t7, zero, sa_reset_game				#else if b3 = 1 -> reset game
+		bne t1, zero, sa_random_gsa				#if b4 = 1 -> random gsa		
 		br end_select_action
 
 	sa_increment_seed:
@@ -439,6 +447,8 @@ main:
 		addi sp, sp, 8							#increment stack pointer
 		ret
 	; END:select_action
+
+	#TESTED
     ; BEGIN:cell_fate
 	cell_fate:
 		addi t0, zero, 2
@@ -448,6 +458,7 @@ main:
 	
 	cf_is_dead:
 		beq a0, t1, cf_change_state					#if dead and 3 neighbours -> change state
+		br end_cell_fate
 
 	cf_is_alive:
 		blt a0, t0, cf_change_state					#if a0 < 2 -> change_state
@@ -540,21 +551,41 @@ main:
 		stw ra, 4(sp)
 
 		ldw t0, PAUSE(zero)						#t0 = GAME_PAUSED
+		beq t0, zero, end_update_gsa			#if (game is paused) -> do nothing
 		ldw t1, GSA_ID(zero)					#t1 = GSA_ID
 		add t2, zero, zero 						#t2 = i = 0 (y)
 		add t3, zero, zero						#t3 = j = 0 (x)
 		addi t5, zero, N_GSA_COLUMNS			#t5 = 12
 		addi t6, zero, N_GSA_LINES				#t6 = 8
 		add s0, zero, zero						#s0 = 0 (the line)
-		beq t0, zero, end_update_gsa			#if (game is paused) -> do nothing
 
 	ug_for:
 		add a0, zero, t3						#a0 = x
 		add a1, zero, t2						#a1 = y
+
+		addi sp, sp, -28
+		stw t0, 0(sp)
+		stw t1, 4(sp)
+		stw t2, 8(sp)
+		stw t3, 12(sp)
+		stw t4, 16(sp)
+		stw t5, 20(sp)
+		stw t6, 24(sp)
+
 		call find_neighbours					#find_neighbours(x, y)
 		add a0, zero, v0						#a0 = # of living neighbours
 		add a1, zero, v1						#a1 = state of cell
 		call cell_fate							#cell_fate(x, y)
+
+		ldw t0, 0(sp)
+		ldw t1, 4(sp)
+		ldw t2, 8(sp)
+		ldw t3, 12(sp)
+		ldw t4, 16(sp)
+		ldw t5, 20(sp)
+		ldw t6, 24(sp)
+		addi sp, sp, 28
+
 		beq zero, v0, ug_skip_activate			#if v0 = 0 skip activation
 		addi t4, zero, 1						#t4 = 1
 		sll t4, t4, t3							#t4 = t4 << x
