@@ -32,12 +32,6 @@
 ############################################    MAIN    ###############################################
 main:
 	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
-	addi s0, zero, 1
-	stw s0, SEED(zero)
-	call draw_gsa
-	addi a0, zero, 2
-	addi a1, zero, 0
-	call find_neighbours
 	GoL:
 		call reset_game
 		call get_input
@@ -486,14 +480,13 @@ main:
 		jmpi start_nei	
 	start_nei:
 		stw t0, 8(sp)
-
 		addi a1, a1, -1								#start iteration at y-1
 		addi t4, zero, 0							#j = 0
 		addi t5, zero, 0							#sum = 0		
 		addi t6, zero, 3							#bound for both loops
 		jmpi neighbour_loop
-
 	pre_neigh:
+		ldw t0, 8(sp)
 		addi t4, t4, 1								#j+=1
 		addi a1, a1, 1								#line += 1
 		bge t4, t6, end_neighbours					#end loop if j >= 3
@@ -503,10 +496,9 @@ main:
 		call mod									#apply modulo
 		add a0, zero, v0							#y coordinate for line
 		call get_gsa
-		ldw a3, 8(sp)								#a3 is now the rotation to get center at (l-2)
+		ldw a3, 8(sp)								#a3 is now the rotation to get center at index 1
 		add a2, zero, v0							#the line in question
 		call custom_rol
-		addi t6, zero, 3
 		
 		addi t7, zero, 0							#i = 0
 		
@@ -526,8 +518,7 @@ main:
 	non_cell_line:
 		andi t3, v0, 1								#last cell
 		add t5, t5, t3								#add neighbour to t5 which is the sum of neighbours
-		srli t2, t2, 1								#shift line by one
-		
+		srli v0, v0, 1								#shift line by one
 		addi t7, t7, 1								#i += 1
 		bge t7, t6, pre_neigh						#loop it when i!=3
 		jmpi non_cell_line
@@ -536,6 +527,7 @@ main:
 		ldw ra, 0(sp)
 		addi sp, sp, 12
 		add v0, zero, t5							#v0 is total sum t5
+		srli v1, v1, 1
 		ret
 	; END:find_neighbours
 
@@ -770,11 +762,11 @@ main:
 	mod:
 		addi sp, sp, -4
 		stw ra, 0(sp)
-
+	mod_loop:
 		blt a2, zero, negative			#procedure for negatives
 		blt a2, a3, end_mod				#end condition
 		sub a2, a2, a3					#a=a-mod                      mod is a3
-		jmpi mod						#loop it
+		jmpi mod_loop					#loop it
 	negative:
 		bge a2, zero, end_mod			#a>=0  -> end
 		add a2, a2, a3					#a=a+mod
@@ -788,24 +780,26 @@ main:
 	custom_rol:
 		#a2 the line
 		#a3 the shift
+		beq a3, zero, noroll
 		addi sp, sp, -4
 		stw ra, 0(sp)
 		add t0, zero, a2
 		add t1, zero, a3
 	lil_loop:
 		addi t2, zero, 1
-		srli t2, t2, 31
 		ror t0, t0, t2
+		slli t2, t2, 31
 		and t2, t2, t0
-		srli t2, t2, 12
-		add t6, t0, t2
-		andi v0, t6, 0xFFF
-
+		srli t2, t2, 20  
+		add t0, t0, t2
+		andi v0, t0, 0xFFF
 		addi t1, t1, -1
 		bne t1, zero, lil_loop
-
 		ldw ra, 0(sp)
 		addi sp, sp, 4
+		ret
+	noroll:
+		add v0, zero, a2
 		ret
 	;END:helper
 
