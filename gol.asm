@@ -692,10 +692,14 @@ main:
 		and t6, t6, t3							#t6 = seven_segs(1)
 		srli t7, t2, 12							#curr_step shift right
 		and t7, t7, t3							#t7 = seven_segs(0)
-
+		
+		slli t4, t4, 2
 		ldw t4, font_data(t4)					#t4 = display(t4)
+		slli t5, t5, 2
 		ldw t5, font_data(t5)					#t5 = display(t5)
+		slli t6, t6, 2
 		ldw t6, font_data(t6)					#t6 = display(t6)
+		slli t7, t7, 2
 		ldw t7, font_data(t7)					#t7 = display(t7)
 
 		stw t4, SEVEN_SEGS+12(zero)
