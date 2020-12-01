@@ -32,6 +32,10 @@
 ############################################    MAIN    ###############################################
 main:
 	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
+
+	call decrement_step
+	ret
+
 	GoL:
 		call reset_game
 		call get_input
@@ -661,11 +665,11 @@ main:
     ; BEGIN:decrement_step
 	decrement_step: 
 		ldw t0, PAUSE(zero)						#t0 = PAUSE
+		beq t0, zero, ds_ret_zero				#pause == 0 -> display and return 0
 		ldw t1, CURR_STATE(zero)				#t1 = CURR_STATE
 		ldw t2, CURR_STEP(zero)					#t2 = CURR_STEP
 		cmpeqi t1, t1, RUN						#t1 = curr_state == run
 		beq t1, zero, ds_ret_zero				#if t1 = false -> display and return 0
-		beq t0, zero, ds_ret_zero				#else if pause == 0 -> display and return 0
 		beq t2, zero, ds_ret_one				#if curr_step == 0 -> return 1
 		addi t2, t2, -1							#decrement curr_step
 		stw t2, CURR_STEP(zero)					#store curr_step
