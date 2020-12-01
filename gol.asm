@@ -461,6 +461,7 @@ main:
 	end_cell_fate:
 		ret
 	; END:cell_fate
+
 	#TESTED
     ; BEGIN:find_neighbours
 	find_neighbours:
@@ -699,7 +700,7 @@ main:
 	end_decrement_step:
 		ret
 	; END:decrement_step
-
+	
     ; BEGIN:reset_game
 	reset_game:
 		addi sp, sp, -4
