@@ -661,11 +661,11 @@ main:
     ; BEGIN:decrement_step
 	decrement_step: 
 		ldw t0, PAUSE(zero)						#t0 = PAUSE
+		beq t0, zero, ds_ret_zero				#else if pause == 0 -> display and return 0
 		ldw t1, CURR_STATE(zero)				#t1 = CURR_STATE
 		ldw t2, CURR_STEP(zero)					#t2 = CURR_STEP
 		cmpeqi t1, t1, RUN						#t1 = curr_state == run
 		beq t1, zero, ds_ret_zero				#if t1 = false -> display and return 0
-		beq t0, zero, ds_ret_zero				#else if pause == 0 -> display and return 0
 		beq t2, zero, ds_ret_one				#if curr_step == 0 -> return 1
 		addi t2, t2, -1							#decrement curr_step
 		stw t2, CURR_STEP(zero)					#store curr_step
@@ -688,10 +688,14 @@ main:
 		and t6, t6, t3							#t6 = seven_segs(1)
 		srli t7, t2, 12							#curr_step shift right
 		and t7, t7, t3							#t7 = seven_segs(0)
-
+		
+		slli t4, t4, 2
 		ldw t4, font_data(t4)					#t4 = display(t4)
+		slli t5, t5, 2
 		ldw t5, font_data(t5)					#t5 = display(t5)
+		slli t6, t6, 2
 		ldw t6, font_data(t6)					#t6 = display(t6)
+		slli t7, t7, 2
 		ldw t7, font_data(t7)					#t7 = display(t7)
 
 		stw t4, SEVEN_SEGS+12(zero)
