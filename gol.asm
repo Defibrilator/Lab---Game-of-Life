@@ -336,7 +336,7 @@ main:
 		addi t6, zero, 1						#t6 = 1
 		slli t6, zero, 3						#t6 = 0b1000
 		and t6, t6, a0							#t6 = b3
-		bne t6, t2, end_update_state			#or if b3 != 1 -> do nothing
+		bne t6, t2, end_update_state			#if b3 != 1 -> do nothing
 		ldw t0, CURR_STEP(zero)					#t0 = CURR_STEP
 		ldw t4, MAX_STEP(zero)					#t4 = MAX_STEP
 		blt t0, t4, end_update_state			#if CURR_STEP < MAX_STEP -> do nothing
@@ -440,7 +440,7 @@ main:
 		addi t0, zero, 2
 		addi t1, zero, 3
 		addi t2, zero, 4
-		bne a1, zero, is_alive						#if a1 != 0 -> is_alive else is_dead
+		bne a1, zero, cf_is_alive						#if a1 != 0 -> is_alive else is_dead
 	
 	cf_is_dead:
 		beq a0, t1, cf_change_state					#if dead and 3 neighbours -> change state
@@ -709,6 +709,8 @@ main:
 		addi sp, sp, -4
 		stw ra, 0(sp)
 
+		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
+
 		addi t0, zero, 1						#t0 = 1
 		ldw t1, font_data+4(zero)				#t1 = display(1)
 		ldw t2, font_data(zero)					#t2 = display(0)
@@ -719,13 +721,12 @@ main:
 		stw t2, SEVEN_SEGS+4(zero)
 		stw t2, SEVEN_SEGS(zero)				#display 0001
 
-		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
 		stw zero, SEED(zero)					#SEED = 0
+		stw zero, GSA_ID(zero)					#GSA_ID = 0
 		stw zero, PAUSE(zero)					#Game is paused	
 		stw t0, SPEED(zero)						#SPEED = 1
 
 		#Game state 0 is initialized to the seed 0
-		stw t0, GSA_ID(zero)					#GSA_ID = 1 to init GSA0
 		ldw a0, seed0(zero)
 		call set_gsa
 		ldw a0, seed0+4(zero)
@@ -749,12 +750,8 @@ main:
 		ldw a0, seed0+28(zero)
 		addi a1, a1, 1							#a1 = a1 + 1
 		call set_gsa
-		ldw a0, seed0+32(zero)
-		addi a1, a1, 1							#a1 = a1 + 1
-		call set_gsa
 
 	end_reset_game:
-		stw zero, GSA_ID(zero)					#GSA_ID = 0
 		ldw ra, 0(sp)
 		addi sp, sp, 4
 		ret
