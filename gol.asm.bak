@@ -32,7 +32,6 @@
 ############################################    MAIN    ###############################################
 main:
 	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
-	
 	GoL:
 		call reset_game
 		call get_input
@@ -119,7 +118,7 @@ main:
 	set_gsa:
 		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
 		slli t1, a1, 2							#t1 = a0 * 4
-		beq t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
+		bne t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
 		stw a0, GSA0(t1)						#store a0 (the line) in correct GSA0 element
 		br end_set_gsa							#return
 	gsa1_set:
@@ -200,7 +199,7 @@ main:
 			
 	; END:random_gsa
 
-	#TESTED
+		#TESTED
     ; BEGIN:change_speed
 	change_speed:
 		addi t1, zero, 1						#t1 = 1
@@ -222,6 +221,7 @@ main:
 		ret
 	; END:change_speed
 
+		#TESTED
     ; BEGIN:pause_game
 	pause_game:
 		ldw t0, PAUSE(zero)					#load the pause flag
@@ -254,6 +254,7 @@ main:
 	increment_seed:
 		addi sp, sp ,-4
 		stw ra, 0(sp)
+
 		ldw t0, SEED(zero)						#load seed in t0
 		addi t0, t0, 1							#increment by 1
 		addi t1, zero, N_SEEDS
@@ -291,7 +292,8 @@ main:
 		addi sp, sp, 4
 		ret
 	; END:increment_seed
-
+		
+#TODO
 	; BEGIN:update_state
 	update_state:
 		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
@@ -311,23 +313,23 @@ main:
 		ldw t5, N_SEEDS(zero)					#t5 = N_SEEDS
 		beq t6, t2, us_init_to_run				#if b1 = 1 -> change state to run
 		beq t4, t5, us_init_to_rand				#else if b0 = N -> change state to rand
-		jmpi end_update_state					#else ret
+		br end_update_state						#else ret
 	us_init_to_run:
 		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
 		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 	us_init_to_rand:
 		stw t2, CURR_STATE(zero)				#CURR_STATE = RAND
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 
 		#RAND
 	update_state_rand:
 		beq t6, t2, us_rand_to_run				#if b1 = 1 -> change to run
-		jmpi end_update_state					#else stay on rand
+		br end_update_state						#else stay on rand
 	us_rand_to_run:
 		stw t3, CURR_STATE(zero)				#CURR_STATE = RUN
 		stw t2, PAUSE(zero)						#Game Paused = 1 (running)
-		jmpi end_update_state					#ret
+		br end_update_state						#ret
 
 		#RUN
 	update_state_run:
@@ -462,12 +464,78 @@ main:
 		ret
 	; END:cell_fate
 
+	#TESTED
     ; BEGIN:find_neighbours
 	find_neighbours:
-		; your implementation code
+		#a0 = x coordinate
+		#a1 = y coordinate
+		#v0 = nb of neighbours
+		#v1 = state of the cell in question
+		addi sp, sp, -12
+		stw ra, 0(sp)								#store x in stack
+		stw a1, 4(sp)								#store y in stack
+
+		addi t1, zero, N_GSA_COLUMNS
+		addi t0, a0, -1								#t0 = x-1
+
+		bge t0, zero, start_nei						
+	minus_rol:
+		addi t0, t1, -1
+		jmpi start_nei	
+	start_nei:
+		stw t0, 8(sp)
+		addi a1, a1, -1								#start iteration at y-1
+		addi t4, zero, 0							#j = 0
+		addi t5, zero, 0							#sum = 0		
+		addi t6, zero, 3							#bound for both loops
+		jmpi neighbour_loop
+	pre_neigh:
+		ldw t0, 8(sp)
+		addi t4, t4, 1								#j+=1
+		addi a1, a1, 1								#line += 1
+		bge t4, t6, end_neighbours					#end loop if j >= 3
+	neighbour_loop:		
+		add a2, zero, a1							# a2 = y
+		addi a3, zero, 8							# mod 8
+		call mod									#apply modulo
+		add a0, zero, v0							#y coordinate for line
+		call get_gsa
+		ldw a3, 8(sp)								#a3 is now the rotation to get center at index 1
+		add a2, zero, v0							#the line in question
+		call custom_rol
+		
+		addi t7, zero, 0							#i = 0
+		
+		ldw t1, 4(sp)
+		bne a1, t1, non_cell_line					#cell line or not
+
+	cell_line:
+		andi t2, v0, 5								#state of side neighbours
+		andi t3, t2, 1								#last cell
+		add t5, t5, t3								#add neighbour to t5 which is the sum of neighbours
+		srli t2, t2, 2								#shift by 2
+		andi t3, t2, 1								#last cell
+		add t5, t5, t3								#add left neighbour
+		andi v1, v0, 2								#mask for the cell state	
+		jmpi pre_neigh
+		
+	non_cell_line:
+		andi t3, v0, 1								#last cell
+		add t5, t5, t3								#add neighbour to t5 which is the sum of neighbours
+		srli v0, v0, 1								#shift line by one
+		addi t7, t7, 1								#i += 1
+		bge t7, t6, pre_neigh						#loop it when i!=3
+		jmpi non_cell_line
+		
+	end_neighbours:
+		ldw ra, 0(sp)
+		addi sp, sp, 12
+		add v0, zero, t5							#v0 is total sum t5
+		srli v1, v1, 1
 		ret
 	; END:find_neighbours
 
+#TODO
     ; BEGIN:update_gsa
 	update_gsa:
 		addi sp, sp, -8
@@ -511,14 +579,56 @@ main:
 	end_update_gsa:
 		ldw s0, 0(sp)
 		ldw ra, 4(sp)
-		addi sp, sp, 4
+		addi sp, sp, 8
 		ret
 	; END:update_gsa
 
     ; BEGIN:mask
-	mask: #TODO
-		; your implementation code
+	mask:
+		addi sp, sp, -4
+		stw ra, 0(sp)
+
+		ldw t0, SEED(zero)						#load current seed
+		slli t0, t0, 2							#t0 * 4 for addressing
+		addi t1, zero, 0						#i = 0
+		addi t2, zero, N_GSA_LINES				#bound by 
+		ldw t3, MASKS(t0)						#t3 has the current mask
+
+	seed_mask:
+		add a0, zero, t1						
+		addi sp, sp, -8
+		stw t0, 0(sp)
+		stw t1, 4(sp)
+		call get_gsa							#get line i
+		ldw t1, 4(sp)
+		ldw t0, 0(sp)
+		addi sp, sp, 8	
+
+		slli t1, t1, 2							#t1 * 4 for addressing
+
+		ldw t4, 0(t3)							#t4 has the current maks line
+		srli t1, t1, 2							#go back to i for t1
+
+		and a0, v0, t4							#apply the mask
+		add a1, zero, t1						#set y coordinate
+		addi sp, sp, -8
+		stw t0, 0(sp)
+		stw t1, 4(sp)
+		call set_gsa							#set the newly masked line
+		ldw t1, 4(sp)
+		ldw t0, 0(sp)
+		addi sp, sp, 8		
+
+		addi t3, t3, 4							#increment t3 by 4
+		addi t1, t1, 1							#i+=1 and loop
+		blt t1, t2, seed_mask					#loop if i < N_GSA_LINES
+	
+	end_mask:
+		ldw ra, 0(sp)
+		addi sp, sp, 4
 		ret
+		
+
 	; END:mask
 
     ; BEGIN:get_input
@@ -550,6 +660,7 @@ main:
 		ret
 	; END:get_input
 
+#TODO
     ; BEGIN:decrement_step
 	decrement_step: 
 		ldw t0, PAUSE(zero)						#t0 = PAUSE
@@ -600,18 +711,24 @@ main:
 		addi sp, sp, -4
 		stw ra, 0(sp)
 
+		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
+
 		addi t0, zero, 1						#t0 = 1
 		ldw t1, font_data+4(zero)				#t1 = display(1)
+		ldw t2, font_data(zero)					#t2 = display(0)
 		add a1, zero, zero						#a1 = i = 0
 
-		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
-		stw t1, SEVEN_SEGS(zero)				#display 1
+		stw t1, SEVEN_SEGS+12(zero)
+		stw t2, SEVEN_SEGS+8(zero)
+		stw t2, SEVEN_SEGS+4(zero)
+		stw t2, SEVEN_SEGS(zero)				#display 0001
+
+		stw zero, GSA_ID(zero)					#GSA_ID = 0
 		stw zero, SEED(zero)					#SEED = 0
 		stw zero, PAUSE(zero)					#Game is paused	
 		stw t0, SPEED(zero)						#SPEED = 1
 
 		#Game state 0 is initialized to the seed 0
-		stw t0, GSA_ID(zero)					#GSA_ID = 1 to init GSA0
 		ldw a0, seed0(zero)
 		call set_gsa
 		ldw a0, seed0+4(zero)
@@ -640,7 +757,6 @@ main:
 		call set_gsa
 
 	end_reset_game:
-		stw zero, GSA_ID(zero)					#GSA_ID = 0
 		ldw ra, 0(sp)
 		addi sp, sp, 4
 		ret
@@ -650,11 +766,46 @@ main:
 	.equ MAX_STEP, 0x1000
 
 	mod:
-		blt a0, a1, end_mod
-		sub a0, a0, a1
-		jmpi mod
+		addi sp, sp, -4
+		stw ra, 0(sp)
+	mod_loop:
+		blt a2, zero, negative			#procedure for negatives
+		blt a2, a3, end_mod				#end condition
+		sub a2, a2, a3					#a=a-mod                      mod is a3
+		jmpi mod_loop					#loop it
+	negative:
+		bge a2, zero, end_mod			#a>=0  -> end
+		add a2, a2, a3					#a=a+mod
+		jmpi negative
 	end_mod:
-		add v0, zero, a0
+		add v0, zero, a2				#return a0 mod a1
+		ldw ra, 0(sp)
+		addi sp, sp, 4
+		ret
+
+	custom_rol:
+		#a2 the line
+		#a3 the shift
+		beq a3, zero, noroll
+		addi sp, sp, -4
+		stw ra, 0(sp)
+		add t0, zero, a2
+		add t1, zero, a3
+	lil_loop:
+		addi t2, zero, 1
+		ror t0, t0, t2
+		slli t2, t2, 31
+		and t2, t2, t0
+		srli t2, t2, 20
+		add t0, t0, t2
+		andi v0, t0, 0xFFF
+		addi t1, t1, -1
+		bne t1, zero, lil_loop
+		ldw ra, 0(sp)
+		addi sp, sp, 4
+		ret
+	noroll:
+		add v0, zero, a2
 		ret
 	;END:helper
 

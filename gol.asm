@@ -438,27 +438,22 @@ main:
 
     ; BEGIN:cell_fate
 	cell_fate:
-		cmplti t0, a0, 2						#t0 = a0 < 2
-		cmpgei t1, a0, 4						#t1 = a0 > 3
-		or t0, t0, t1							#t0 = (a0 < 2) OR (a0 > 3)
-		and t0, t0, a1							#t0 = t0 and a1
-		bne t0, zero, cf_die					#if t0 = 1 -> cell dies
-		cmpeqi t0, a0, 2						#t0 = (a0 == 2)
-		cmpeqi t1, a0, 3						#t1 = (a0 == 3)
-		or t0, t0, t1							#t0 = (a0 == 2) OR (a0 == 3)
-		xori t2, a1, 1							#t2 = not a1
-		cmpeq t3, t2, t1						#t3 = dead AND t1
-		cmpeq t4, a1, t0						#t4 = alive AND t0
-		or t3, t3, t4							#t3 = t3 OR t4
-		bne t3, zero, cf_live					#if t3 -> cell lives
-		ret										#return
-		
-	cf_live:
-		addi v0, zero, 1						#v0 = 1
-		br end_cell_fate						#return
+		addi t0, zero, 2
+		addi t1, zero, 3
+		addi t2, zero, 4
+		bne a1, zero, is_alive						#if a1 != 0 -> is_alive else is_dead
+	
+	cf_is_dead:
+		beq a0, t1, cf_change_state					#if dead and 3 neighbours -> change state
 
-	cf_die:
-		add v0, zero, zero						#v0 = 0
+	cf_is_alive:
+		blt a0, t0, cf_change_state					#if a0 < 2 -> change_state
+		bge  a0, t2, cf_change_state				#else if a0 > 3 -> change_state
+		addi v0, zero, 1							#v0 = 1
+		br end_cell_fate							#else do nothing
+
+	cf_change_state:
+		xori v0, a1, 1								#v0 = !a1
 
 	end_cell_fate:
 		ret
@@ -573,7 +568,7 @@ main:
 		blt t2, t6, ug_for						#loop if i < 8
 
 	ug_finish_update:
-		xori t1, zero, 1						#flip t1
+		xori t1, t1, 1							#flip t1
 		stw t1, GSA_ID(zero)					#store GSA_ID
 
 	end_update_gsa:
@@ -706,11 +701,12 @@ main:
 		ret
 	; END:decrement_step
 
-#TODO
     ; BEGIN:reset_game
 	reset_game:
 		addi sp, sp, -4
 		stw ra, 0(sp)
+
+		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
 
 		addi t0, zero, 1						#t0 = 1
 		ldw t1, font_data+4(zero)				#t1 = display(1)
@@ -722,13 +718,12 @@ main:
 		stw t2, SEVEN_SEGS+4(zero)
 		stw t2, SEVEN_SEGS(zero)				#display 0001
 
-		stw t0, CURR_STEP(zero)					#CURR_STEP = 1
+		stw zero, GSA_ID(zero)					#GSA_ID = 0
 		stw zero, SEED(zero)					#SEED = 0
 		stw zero, PAUSE(zero)					#Game is paused	
 		stw t0, SPEED(zero)						#SPEED = 1
 
 		#Game state 0 is initialized to the seed 0
-		stw t0, GSA_ID(zero)					#GSA_ID = 1 to init GSA0
 		ldw a0, seed0(zero)
 		call set_gsa
 		ldw a0, seed0+4(zero)
@@ -757,7 +752,6 @@ main:
 		call set_gsa
 
 	end_reset_game:
-		stw zero, GSA_ID(zero)					#GSA_ID = 0
 		ldw ra, 0(sp)
 		addi sp, sp, 4
 		ret
