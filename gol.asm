@@ -118,7 +118,7 @@ main:
 	set_gsa:
 		ldw t0, GSA_ID(zero)					#load GSA_ID in t0
 		slli t1, a1, 2							#t1 = a0 * 4
-		beq t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
+		bne t0, zero, gsa1_set					#if the current gsa is the 0 go to gsa1_set
 		stw a0, GSA0(t1)						#store a0 (the line) in correct GSA0 element
 		br end_set_gsa							#return
 	gsa1_set:
@@ -199,7 +199,7 @@ main:
 			
 	; END:random_gsa
 
-	#TESTED
+		#TESTED
     ; BEGIN:change_speed
 	change_speed:
 		addi t1, zero, 1						#t1 = 1
@@ -221,6 +221,7 @@ main:
 		ret
 	; END:change_speed
 
+		#TESTED
     ; BEGIN:pause_game
 	pause_game:
 		ldw t0, PAUSE(zero)					#load the pause flag
@@ -291,7 +292,8 @@ main:
 		addi sp, sp, 4
 		ret
 	; END:increment_seed
-
+		
+#TODO
 	; BEGIN:update_state
 	update_state:
 		ldw t0, CURR_STATE(zero)				#t0 = CURR_STATE
@@ -475,6 +477,7 @@ main:
 
 		addi t1, zero, N_GSA_COLUMNS
 		addi t0, a0, -1								#t0 = x-1
+
 		bge t0, zero, start_nei						
 	minus_rol:
 		addi t0, t1, -1
@@ -532,6 +535,7 @@ main:
 		ret
 	; END:find_neighbours
 
+#TODO
     ; BEGIN:update_gsa
 	update_gsa:
 		addi sp, sp, -8
@@ -656,6 +660,7 @@ main:
 		ret
 	; END:get_input
 
+#TODO
     ; BEGIN:decrement_step
 	decrement_step: 
 		ldw t0, PAUSE(zero)						#t0 = PAUSE
@@ -700,7 +705,8 @@ main:
 	end_decrement_step:
 		ret
 	; END:decrement_step
-	
+
+#TODO
     ; BEGIN:reset_game
 	reset_game:
 		addi sp, sp, -4
@@ -791,7 +797,7 @@ main:
 		ror t0, t0, t2
 		slli t2, t2, 31
 		and t2, t2, t0
-		srli t2, t2, 20  
+		srli t2, t2, 20
 		add t0, t0, t2
 		andi v0, t0, 0xFFF
 		addi t1, t1, -1
