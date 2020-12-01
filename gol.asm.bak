@@ -33,7 +33,9 @@
 main:
 	addi sp, zero, 0x2000						#init stack pointer to 0x2000 going downwards
 
-	call update_state
+	call update_gsa
+	call draw_gsa
+
 	ret
 
 	GoL:
@@ -295,7 +297,7 @@ main:
 		ret
 	; END:increment_seed
 		
-#TODO
+	#TESTED
 	; BEGIN:update_state
 	update_state:
 		addi sp, sp, -4
@@ -458,13 +460,14 @@ main:
 	
 	cf_is_dead:
 		beq a0, t1, cf_change_state					#if dead and 3 neighbours -> change state
+		add v0, zero, zero							#else v0 = 0
 		br end_cell_fate
 
 	cf_is_alive:
 		blt a0, t0, cf_change_state					#if a0 < 2 -> change_state
 		bge  a0, t2, cf_change_state				#else if a0 > 3 -> change_state
-		addi v0, zero, 1							#v0 = 1
-		br end_cell_fate							#else do nothing
+		addi v0, zero, 1							#else v0 = 1
+		br end_cell_fate							#return
 
 	cf_change_state:
 		xori v0, a1, 1								#v0 = !a1
@@ -593,18 +596,22 @@ main:
 	ug_skip_activate:
 		addi t3, t3, 1							#j = j + 1
 		blt t3, t5, ug_for						#loop if j < 12
+		ldw t1, GSA_ID(zero)					#t1 = GSA_ID
 		xori t1, t1, 1							#flip t1
 		stw t1, GSA_ID(zero)					#store GSA_ID
 		add a0, zero, s0						#a0 = the line
 		add a1, zero, t2						#a1 = y
 		call set_gsa							#set_gsa(line, y)
+		ldw t1, GSA_ID(zero)					#t1 = GSA_ID
 		xori t1, t1, 1							#flip t1
 		stw t1, GSA_ID(zero)					#store GSA_ID
 		addi t2, t2, 1							#i = i + 1
 		add t3, zero, zero						#j = 0
+		add s0, zero, zero						#s0 = 0
 		blt t2, t6, ug_for						#loop if i < 8
 
 	ug_finish_update:
+		ldw t1, GSA_ID(zero)					#t1 = GSA_ID
 		xori t1, t1, 1							#flip t1
 		stw t1, GSA_ID(zero)					#store GSA_ID
 
